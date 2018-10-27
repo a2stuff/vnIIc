@@ -1,0 +1,99 @@
+<!doctype html>
+<title>Screen Capture Demo</title>
+<style>
+video, canvas { border: 2px dotted black; }
+</style>
+
+canvas:<br>
+<canvas id=can width=280 height=192></canvas>
+<br>
+quantized:<br>
+<canvas id=quant width=280 height=192></canvas>
+
+<script>
+const palette = [
+  /* Black1 */ [0x00, 0x00, 0x00],
+  /* Green  */ [0x2f, 0xbc, 0x1a],
+  /* Violet */ [0xd0, 0x43, 0xe5],
+  /* White1 */ [0xff, 0xff, 0xff],
+  /* Black2 */ [0x00, 0x00, 0x00],
+  /* Orange */ [0xd0, 0x6a, 0x1a],
+  /* Blue   */ [0x2f, 0x95, 0xe5],
+  /* White2 */ [0xff, 0xff, 0xff]
+];
+
+(async function() {
+  const $ = document.querySelector.bind(document);
+  try {
+    const mediaStream = await navigator.getDisplayMedia({video:true});
+    const vid = document.createElement('video');
+    vid.srcObject = mediaStream;
+    vid.play();
+
+    const can = $('#can');
+    const ctx = can.getContext('2d');
+
+    const quant = $('#quant');
+    const qctx = quant.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    setInterval(() => {
+      ctx.drawImage(vid, 0, 0, can.width, can.height);
+
+      const imagedata = ctx.getImageData(0, 0, can.width, can.height);
+      // TODO: modify data
+
+      quantize(imagedata);
+
+      qctx.putImageData(imagedata, 0, 0);
+
+    }, 500);
+
+  } catch (e) {
+    console.warn(`Error: ${e.name} - ${e.message}`);
+  }
+})();
+
+function distance(r1,g1,b1,r2,b2,g2) {
+  const dr = r1 - r2;
+  const dg = g1 - g2;
+  const db = b1 - b2;
+  return  Math.sqrt(dr*dr + dg*dg + db*db);
+}
+
+function quantize(imagedata) {
+  const hash = {};
+  for (let i = 0; i < palette.length; ++i) {
+    const entry = palette[i];
+    const rgb = (entry[0] << 16) | (entry[1] << 8) | entry[2];
+    hash[rgb] = i;
+  }
+
+// Nearest Neighbor
+  for (let i = 0; i < imagedata.data.length; i += 4) {
+    const r = imagedata.data[i];
+    const g = imagedata.data[i+1];
+    const b = imagedata.data[i+2];
+
+    const rgb = (r << 16) | (g << 8) | b;
+    let index = hash[rgb];
+    if (index === undefined) {
+      let dist;
+      for (let p = 0; p < palette.length; ++p) {
+        const entry = palette[p];
+        const d = distance(r,g,b, entry[0], entry[1], entry[2]);
+        if (dist === undefined || d < dist) {
+          dist = d;
+          index = p;
+        }
+      }
+      hash[rgb] = index;
+    }
+
+    const pi = palette[index];
+    imagedata.data[i] = pi[0];
+    imagedata.data[i+1] = pi[1];
+    imagedata.data[i+2] = pi[2];
+  }
+}
+
+</script>

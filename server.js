@@ -237,4 +237,35 @@
       }
     }
   }
+
+  $('#bootstrap').addEventListener('click', async e => {
+
+    const CLIENT_ADDR = 0x6000;
+    const CLIENT_FILE = 'client/client.bin';
+
+    function send(str) {
+      // TODO: Send this over serial, obviously...
+      console.log(str);
+    }
+
+    send('CALL -151'); // Enter Monitor
+
+    const response = await fetch(CLIENT_FILE);
+    if (!response.ok)
+      throw new Error(response.statusText);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let addr = CLIENT_ADDR;
+    for (let offset = 0; offset < bytes.length; offset += 8) {
+      const str = addr.toString(16).toUpperCase() + ': ' +
+              [...bytes.slice(offset, offset + 8)]
+              .map(b => ('00' + b.toString(16).toUpperCase()).substr(-2))
+              .join(' ');
+
+      send(str);
+    }
+
+    send('\x03'); // Ctrl+C - Exit Monitor
+    send(`CALL ${CLIENT_ADDR}`); // Execute client
+  });
+
 })();

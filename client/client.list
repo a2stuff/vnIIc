@@ -1,0 +1,933 @@
+ca65 V2.16 - Git f5e9b401
+Main file   : client.s
+Current file: client.s
+
+000000r 1               
+000000r 1               PADDLE_SUPPORT = 1
+000000r 1               ;MOUSE_SUPPORT  = 1   ; NOTE: tests for ifdef
+000000r 1               
+000000r 1               ;---------------------------------------------------------
+000000r 1               ; Super Serial constants/locations
+000000r 1               ;---------------------------------------------------------
+000000r 1               
+000000r 1               ; These get incremented by the slot where they appear
+000000r 1               UACTRL   = $C08B   ; Control Register
+000000r 1               UACMND   = $C08A   ; Command Register
+000000r 1               UASTAT   = $C089   ; Status Register
+000000r 1               UADATA   = $C088   ; Data Register - incoming and outgoing data
+000000r 1               
+000000r 1               
+000000r 1               ;---------------------------------------------------------
+000000r 1               ; Hi-res graphics constants/locations
+000000r 1               ;---------------------------------------------------------
+000000r 1               
+000000r 1               PLOTPAGE  = $E6 ; Active hires plotting page (Applesoft)
+000000r 1               PLOTPAGE1 = $20
+000000r 1               PLOTPAGE2 = $40
+000000r 1               PAGESIZE  = $20 ; Size of hi-res screen in pages
+000000r 1               
+000000r 1               
+000000r 1               CLRTEXT  = $C050 ;display graphics
+000000r 1               SETTEXT  = $C051 ;display text
+000000r 1               CLRMIXED = $C052 ;clear mixed mode- enable full graphics
+000000r 1               SETMIXED = $C053 ;enable graphics/text mixed mode
+000000r 1               PAGE1    = $C054 ;select text/graphics page1
+000000r 1               PAGE2    = $C055 ;select text/graphics page2
+000000r 1               CLRHIRES = $C056 ;select Lo-res
+000000r 1               SETHIRES = $C057 ;select Hi-res
+000000r 1               
+000000r 1               
+000000r 1               ;---------------------------------------------------------
+000000r 1               ; Keyboard input constants/locations
+000000r 1               ;---------------------------------------------------------
+000000r 1               
+000000r 1               KEYBD     =   $C000 ; key down in bit 7; key code in lower bits
+000000r 1               STROBE    =   $C010 ; write to clear key down state
+000000r 1               OPNAPPLE  =   $C061 ; open apple (command) key data (read)
+000000r 1               CLSAPPLE  =   $C062 ; closed apple (option) key data (read)
+000000r 1               PB2       =   $C063 ; Paddle button 2 (read)
+000000r 1               PB3       =   $C060 ; Paddle button 3 (read)
+000000r 1               
+000000r 1               
+000000r 1               ;---------------------------------------------------------
+000000r 1               ; Paddle/Joystick constants/locations/routines
+000000r 1               ;---------------------------------------------------------
+000000r 1               
+000000r 1               PADDLE0 =  $C064    ; bit 7 = status of pdl-0 timer (read)
+000000r 1               PADDLE1 =  $C065    ; bit 7 = status of pdl-1 timer (read)
+000000r 1               PADDLE2 =  $C066    ; bit 7 = status of pdl-2 timer (read)
+000000r 1               PADDLE3 =  $C067    ; bit 7 = status of pdl-3 timer (read)
+000000r 1               PDLTRIG =  $C070    ; trigger paddles
+000000r 1               
+000000r 1               PREAD   =  $FB1E    ; Monitor paddle reading routine, call
+000000r 1                                   ; with paddle # in X, returns value in Y
+000000r 1               
+000000r 1               
+000000r 1               ;--------------------------------------------------
+000000r 1               ; Mouse locations and constants
+000000r 1               ;--------------------------------------------------
+000000r 1               
+000000r 1               ; For READMOUSE and POSMOUSE
+000000r 1               
+000000r 1               MOUSE_X_LSB = $0478     ; + slot        Low byte of absolute X position
+000000r 1               MOUSE_X_MSB = $0578     ; + slot        High byte of absolute X position
+000000r 1               MOUSE_Y_LSB = $04F8     ; + slot        Low byte of absolute Y position
+000000r 1               MOUSE_Y_MSB = $05F8     ; + slot        High byte of absolute Y position
+000000r 1               MOUSE_RSV1  = $0678     ; + slot        Reserved and used by the firmware
+000000r 1               MOUSE_RSV2  = $06F8     ; + slot        Reserved and used by the firmware
+000000r 1               MOUSE_BTN   = $0778     ; + slot        Button 0/1 interrupt status byte
+000000r 1               MOUSE_MODE  = $07F8     ; + slot        Mode byte
+000000r 1               
+000000r 1               ; For CLAMPMOUSE:
+000000r 1               
+000000r 1               MOUSE_CMIN_LSB = $0478   ; low byte of low clamp
+000000r 1               MOUSE_CMIN_MSB = $0578   ; high byte of low clamp
+000000r 1               MOUSE_CMAX_LSB = $04F8   ; low byte of high clamp
+000000r 1               MOUSE_CMAX_MSB = $05F8   ; high byte of high clamp
+000000r 1               
+000000r 1               MOUSE_CLAMP_X   = 0     ; Value for A when setting X clamp with CLAMPMOUSE
+000000r 1               MOUSE_CLAMP_Y   = 1     ; Value for A when setting X clamp with CLAMPMOUSE
+000000r 1               
+000000r 1               
+000000r 1               ;---------------------------------------------------------
+000000r 1               ; Other
+000000r 1               ;---------------------------------------------------------
+000000r 1               
+000000r 1               SLOT_CASE =   $c000 ; Firmware for slots are at $cx00
+000000r 1               MAX_SLOT  =   7     ; Maximum slot # on an Apple II
+000000r 1               
+000000r 1               ZP        =   $FA   ; Write cursor location on zero page
+000000r 1               ESCAPE    =   $80   ; Unused image data byte (all black2)
+000000r 1               ESCAPE2   =   $FF   ; Unused image data byte (all white2)
+000000r 1               
+000000r 1               
+000000r 1               ;---------------------------------------------------------
+000000r 1               ; Generic Macros
+000000r 1               ;---------------------------------------------------------
+000000r 1               
+000000r 1               ;----------------------------------------
+000000r 1               .macro SaveRegisters
+000000r 1               ;----------------------------------------
+000000r 1                   pha
+000000r 1                   txa
+000000r 1                   pha
+000000r 1                   tya
+000000r 1                   pha
+000000r 1               .endmacro
+000000r 1               
+000000r 1               ;----------------------------------------
+000000r 1               .macro RestoreRegisters
+000000r 1               ;----------------------------------------
+000000r 1                   pla
+000000r 1                   tay
+000000r 1                   pla
+000000r 1                   tax
+000000r 1                   pla
+000000r 1               .endmacro
+000000r 1               
+000000r 1               
+000000r 1               ;-------------------------------------------------------------------
+000000r 1               ;
+000000r 1               ; Application-level logic
+000000r 1               ;
+000000r 1               ;-------------------------------------------------------------------
+000000r 1               
+000000r 1               
+000000r 1               .ORG $6000
+006000  1               
+006000  1               ;---------------------------------------------------------
+006000  1               .proc APP_ENTRY
+006000  1               ;---------------------------------------------------------
+006000  1               ; Initialize the application, and enter the main loop
+006000  1               ;---------------------------------------------------------
+006000  1  AD C7 61         lda PSLOT          ; Use slot 2
+006003  1  20 71 61         jsr INITSSC        ; Initialize Super Serial Card
+006006  1  20 2C 61         jsr INITHIRES      ; Initialize Hi-Res graphics
+006009  1  20 40 60         jsr INITINPUT      ; Initialize input devices
+00600C  1  20 19 60         jsr MAINLOOP
+00600F  1               
+00600F  1                   ; fall through
+00600F  1               .endproc
+00600F  1               
+00600F  1               ;---------------------------------------------------------
+00600F  1               .proc APP_EXIT
+00600F  1               ;---------------------------------------------------------
+00600F  1               ; Clean up and exit app
+00600F  1               ;---------------------------------------------------------
+00600F  1  20 BE 61         jsr RESETSSC
+006012  1  8D 54 C0         sta PAGE1
+006015  1  8D 51 C0         sta SETTEXT
+006018  1  60               rts
+006019  1               .endproc
+006019  1               
+006019  1               
+006019  1               ;-------------------------------------------------------------------
+006019  1               ;
+006019  1               ; Main loop functionality
+006019  1               ;
+006019  1               ;-------------------------------------------------------------------
+006019  1               
+006019  1               
+006019  1               ;---------------------------------------------------------
+006019  1               .proc MAINLOOP
+006019  1               ;---------------------------------------------------------
+006019  1               
+006019  1               ; TODO: Sort out the protocol - should be able to send
+006019  1               ; input state without receiving data
+006019  1               ;    jsr SSCHASDATA      ; Anything to read?
+006019  1               ;    bne :+              ; Nope
+006019  1               
+006019  1  20 23 60     :   jsr RECEIVEPAGE
+00601C  1  20 43 61         jsr FLIPHIRES
+00601F  1  4C 19 60         jmp :-              ; TODO: define an exit trigger
+006022  1  60               rts
+006023  1               .endproc
+006023  1               
+006023  1               
+006023  1               ;---------------------------------------------------------
+006023  1               .proc RECEIVEPAGE
+006023  1               ;---------------------------------------------------------
+006023  1               ; Pull a hi-res page down over serial
+006023  1               ;
+006023  1               ; Protocol is:
+006023  1               ;  * Recieve 256 bytes (graphic data)
+006023  1               ;  * Send 1 byte (input state)
+006023  1               ;---------------------------------------------------------
+006023  1               
+006023  1  A9 00            lda #0        ; set up write pointer
+006025  1  85 FA            sta ZP
+006027  1  A5 E6            lda PLOTPAGE
+006029  1  85 FB            sta ZP+1
+00602B  1  A2 20            ldx #PAGESIZE ; plan to receive this many pages
+00602D  1  A0 00            ldy #0
+00602F  1               
+00602F  1  20 A9 61     :   jsr SSCGET   ; TODO: look for escape codes in the sequence
+006032  1  91 FA            sta (ZP),Y
+006034  1  C8               iny
+006035  1  D0 F8            bne :-       ; Do a full page...
+006037  1               
+006037  1  20 5E 60         jsr SENDINPUTSTATE ; brief moment to send data back upstream
+00603A  1               
+00603A  1  E6 FB            inc ZP+1
+00603C  1  CA               dex
+00603D  1  D0 F0            bne :-       ; ...as many pages as we need
+00603F  1  60               rts
+006040  1               .endproc
+006040  1               
+006040  1               
+006040  1               ;-------------------------------------------------------------------
+006040  1               ;
+006040  1               ; Input device routines
+006040  1               ;
+006040  1               ;-------------------------------------------------------------------
+006040  1               ; Protocol:
+006040  1               ;  $7f - $ff - key down, ASCII code + $80
+006040  1               ;  otherwise, a transition:
+006040  1               ;
+006040  1                   SIS_KBUP    = $00   ; Key up
+006040  1                   SIS_OADOWN  = $01   ; Open Apple transitioned to down
+006040  1                   SIS_OAUP    = $02   ; Open Apple transitioned to up
+006040  1                   SIS_CADOWN  = $03   ; Closed Apple transitioned to down
+006040  1                   SIS_CAUP    = $04   ; Closed Apple transitioned to up
+006040  1               ;
+006040  1               ;  $05 - $0f : reserved
+006040  1               ;
+006040  1                   SIS_MX      = $10   ; Mouse X high nibble
+006040  1                   SIS_MY      = $20   ; Mouse Y high nibble
+006040  1                   SIS_PDL0    = $30   ; Paddle 0 high nibble
+006040  1                   SIS_PDL1    = $40   ; Paddle 1 high nibble
+006040  1               ;
+006040  1               ;  $50 - $7e : reserved
+006040  1               ;
+006040  1                   SIS_SYNC    = $7f
+006040  1               
+006040  1               ;---------------------------------------------------------
+006040  1               .proc INITINPUT
+006040  1               ;---------------------------------------------------------
+006040  1               ; Initialize input devices and storage for detecting
+006040  1               ; state transitions
+006040  1               ;---------------------------------------------------------
+006040  1               
+006040  1               ; Init keyboard state
+006040  1  A9 00            lda #SIS_KBUP
+006042  1  8D C9 61         sta LASTKB
+006045  1               
+006045  1               ; Init Open/Closed Apple states
+006045  1  A9 02            lda #SIS_OAUP       ; NOTE: Don't store OA state as it fluctuates
+006047  1  8D CA 61         sta LASTOA
+00604A  1  A9 04            lda #SIS_CAUP       ; NOTE: Don't store CA state as it fluctuates
+00604C  1  8D CB 61         sta LASTCA
+00604F  1               
+00604F  1               .ifdef PADDLE_SUPPORT
+00604F  1               ; Init Paddle state
+00604F  1  A9 30            lda #SIS_PDL0
+006051  1  09 08            ora #8              ; Middle of range 0...15
+006053  1  8D CC 61         sta LASTP0
+006056  1  A9 40            lda #SIS_PDL1
+006058  1  09 08            ora #8              ; Middle of range 0...15
+00605A  1  8D CD 61         sta LASTP1
+00605D  1               .endif
+00605D  1               
+00605D  1               .ifdef MOUSE_SUPPORT
+00605D  1                   jsr FINDMOUSE
+00605D  1               .endif
+00605D  1               
+00605D  1  60               rts
+00605E  1               .endproc
+00605E  1               
+00605E  1               
+00605E  1               ;---------------------------------------------------------
+00605E  1               .proc SENDINPUTSTATE
+00605E  1               ;---------------------------------------------------------
+00605E  1               ; Send keyboard joystick and/or mouse state over the
+00605E  1               ; serial port
+00605E  1               ;
+00605E  1               ; Algorithm:
+00605E  1               ; - Send key state (if it changed)
+00605E  1               ; - otherwise send open-apple state (if it changed)
+00605E  1               ; - otherwise send closed-apple state (if it changed)
+00605E  1               ; - otherwise send paddle 0 state (if it changed)
+00605E  1               ; - (TODO: Mouse state)
+00605E  1               ; - otherwise send sync byte
+00605E  1               ;---------------------------------------------------------
+00605E  1               
+00605E  1  48 8A 48 98      SaveRegisters       ; Store registers
+006062  1  48           
+006063  1  18               clc
+006064  1               
+006064  1               ;--------------------------------------
+006064  1               ; Send key state, if it changed
+006064  1               
+006064  1               ; NOTE: Can't use STROBE to detect key up -> key down transition
+006064  1               ; since the msb can change before the key code. Instead, consider
+006064  1               ; these cases:
+006064  1               ;
+006064  1               ;  OLD STATE    KEYBD     STROBE     RESULT
+006064  1               ;   Up           Up        -          No-op
+006064  1               ;   Up           Down      -          Save and send key down
+006064  1               ;   Down         -         Up         Save and send key up
+006064  1               ;   Down         -         Down       Save and send key ONLY if different
+006064  1               ;
+006064  1               
+006064  1  AD C9 61         lda LASTKB
+006067  1  D0 0E            bne KEY_WAS_DOWN
+006069  1               
+006069  1               KEY_WAS_UP:
+006069  1  AD 00 C0         lda KEYBD           ; Read keyboard
+00606C  1  10 27            bpl END_KEY         ; - still up
+00606E  1  8D C9 61         sta LASTKB          ; Down, so save it
+006071  1  20 9A 61         jsr SSCPUT          ; and send it
+006074  1  4C 26 61         jmp DONE
+006077  1               
+006077  1               KEY_WAS_DOWN:
+006077  1                   ; key was down - strobe should match
+006077  1                   ; unless the key changed or was released
+006077  1  AD 10 C0         lda STROBE
+00607A  1  30 0B            bmi STROBE_DOWN
+00607C  1               STROBE_UP:
+00607C  1  A9 00            lda #SIS_KBUP       ; Key was released
+00607E  1  8D C9 61         sta LASTKB          ; so save it
+006081  1  20 9A 61         jsr SSCPUT          ; and send it
+006084  1  4C 26 61         jmp DONE
+006087  1               STROBE_DOWN:
+006087  1  CD C9 61         cmp LASTKB          ; Same key as last time?
+00608A  1  F0 09            beq END_KEY         ; - no change
+00608C  1  8D C9 61         sta LASTKB          ; New key, so save it
+00608F  1  20 9A 61         jsr SSCPUT          ; and send it
+006092  1  4C 26 61         jmp DONE
+006095  1               
+006095  1               END_KEY:
+006095  1               
+006095  1               ;--------------------------------------
+006095  1               ; Send Open Apple state, if it changed
+006095  1               
+006095  1               ; TODO: Can simplify this code if we make the high bits the same
+006095  1               ; for both OA states and bit = 0 down: lda OPNAPPLE ; ROL ; LDA #0 ; ROL ; ORA #signature
+006095  1               
+006095  1               TEST_OA:
+006095  1  AD 61 C0         lda OPNAPPLE        ; Test Open Apple state
+006098  1  30 10            bmi OA_IS_DOWN
+00609A  1               OA_IS_UP:
+00609A  1  A9 02            lda #SIS_OAUP
+00609C  1  CD CA 61         cmp LASTOA          ; Changed?
+00609F  1  F0 19            beq END_OA          ; Nope
+0060A1  1  8D CA 61         sta LASTOA          ; Yes, save it / send it!
+0060A4  1  20 9A 61         jsr SSCPUT
+0060A7  1  4C 26 61         jmp DONE
+0060AA  1               OA_IS_DOWN:
+0060AA  1  A9 01            lda #SIS_OADOWN
+0060AC  1  CD CA 61         cmp LASTOA          ; Changed?
+0060AF  1  F0 09            beq END_OA          ; Nope
+0060B1  1  8D CA 61         sta LASTOA          ; Yes, save it / send it!
+0060B4  1  20 9A 61         jsr SSCPUT
+0060B7  1  4C 26 61         jmp DONE
+0060BA  1               
+0060BA  1               END_OA:
+0060BA  1               
+0060BA  1               ;--------------------------------------
+0060BA  1               ; Send Closed Apple state, if it changed
+0060BA  1               
+0060BA  1               TEST_CA:
+0060BA  1  AD 62 C0         lda CLSAPPLE        ; Has the Open Apple/Button 1 value changed?
+0060BD  1  30 10            bmi CA_IS_DOWN
+0060BF  1               CA_IS_UP:
+0060BF  1  A9 04            lda #SIS_CAUP
+0060C1  1  CD CB 61         cmp LASTCA          ; Changed?
+0060C4  1  F0 19            beq END_CA          ; Nope
+0060C6  1  8D CB 61         sta LASTCA          ; Yes, save it
+0060C9  1  20 9A 61         jsr SSCPUT          ; and send it
+0060CC  1  4C 26 61         jmp DONE
+0060CF  1               CA_IS_DOWN:
+0060CF  1  A9 03            lda #SIS_CADOWN
+0060D1  1  CD CB 61         cmp LASTCA          ; Changed?
+0060D4  1  F0 09            beq END_CA          ; Nope
+0060D6  1  8D CB 61         sta LASTCA          ; Yes, save it
+0060D9  1  20 9A 61         jsr SSCPUT          ; and send it
+0060DC  1  4C 26 61         jmp DONE
+0060DF  1               
+0060DF  1               END_CA:
+0060DF  1               
+0060DF  1               .ifdef PADDLE_SUPPORT
+0060DF  1               
+0060DF  1               ;--------------------------------------
+0060DF  1               ; Send Paddle 0 state, if it changed
+0060DF  1               TEST_PDL0:
+0060DF  1  A2 00            ldx #0
+0060E1  1  20 1E FB         jsr PREAD
+0060E4  1  98               tya
+0060E5  1  4A               lsr                 ; Shift to low nibble
+0060E6  1  4A               lsr
+0060E7  1  4A               lsr
+0060E8  1  4A               lsr
+0060E9  1  09 30            ora #SIS_PDL0       ; And mark it with the signature
+0060EB  1  CD CC 61         cmp LASTP0          ; Change?
+0060EE  1  F0 09            beq END_PDL0        ; Nope
+0060F0  1  8D CC 61         sta LASTP0          ; Yes, save it
+0060F3  1  20 9A 61         jsr SSCPUT          ; and send it
+0060F6  1  4C 26 61         jmp DONE
+0060F9  1               END_PDL0:
+0060F9  1                   ; Chew up time so next paddle read will be correct
+0060F9  1                   ; TODO: Replace this with a "read both" strobes
+0060F9  1                   ; routine
+0060F9  1  EA EA EA EA  :   .repeat 11          ; By experiment, need 11 NOPs.
+0060FD  1  EA EA EA EA  
+006101  1  EA EA EA     
+006104  1                   nop
+006104  1                   .endrep
+006104  1  C8               iny
+006105  1  D0 F2            bne :-
+006107  1               
+006107  1               ;--------------------------------------
+006107  1               ; Send Paddle 1 state, if it changed
+006107  1               TEST_PDL1:
+006107  1  A2 01            ldx #1
+006109  1  20 1E FB         jsr PREAD
+00610C  1  98               tya
+00610D  1  4A               lsr                 ; Shift to low nibble
+00610E  1  4A               lsr
+00610F  1  4A               lsr
+006110  1  4A               lsr
+006111  1  09 40            ora #SIS_PDL1       ; And mark it with the signature
+006113  1  CD CD 61         cmp LASTP1          ; Change?
+006116  1  F0 09            beq END_PDL1        ; Nope
+006118  1  8D CD 61         sta LASTP1          ; Yes, save it
+00611B  1  20 9A 61         jsr SSCPUT          ; and send it
+00611E  1  4C 26 61         jmp DONE
+006121  1               END_PDL1:
+006121  1                   ; NOTE: No need to chew time like PDL0
+006121  1                   ; since data receive will make up for it; if we
+006121  1                   ; loop in SENDINPUTSTATE need to add it here
+006121  1               
+006121  1               .endif
+006121  1               
+006121  1               
+006121  1               ;--------------------------------------
+006121  1               .ifdef MOUSE_SUPPORT
+006121  1                   .error "Mouse support not fully implemented"
+006121  1               .endif
+006121  1               
+006121  1               ;--------------------------------------
+006121  1               ; No state changes so send sync byte
+006121  1               
+006121  1  A9 7F            lda #SIS_SYNC
+006123  1  20 9A 61         jsr SSCPUT
+006126  1               
+006126  1               DONE:
+006126  1  68 A8 68 AA      RestoreRegisters
+00612A  1  68           
+00612B  1  60               rts
+00612C  1               
+00612C  1               .endproc
+00612C  1               
+00612C  1               
+00612C  1               ;-------------------------------------------------------------------
+00612C  1               ;
+00612C  1               ; Hi-res graphics routines
+00612C  1               ;
+00612C  1               ;-------------------------------------------------------------------
+00612C  1               
+00612C  1               ;---------------------------------------------------------
+00612C  1               .proc INITHIRES
+00612C  1               ;---------------------------------------------------------
+00612C  1               ; Set up the graphics display and pointers
+00612C  1               ;---------------------------------------------------------
+00612C  1  A9 20            lda #PLOTPAGE1   ; clear page 1
+00612E  1  85 E6            sta PLOTPAGE
+006130  1  20 59 61         jsr CLEARHIRES
+006133  1               
+006133  1  20 43 61         jsr FLIPHIRES    ; then show it and flip to 2
+006136  1  8D 57 C0         sta SETHIRES
+006139  1  8D 50 C0         sta CLRTEXT
+00613C  1  8D 52 C0         sta CLRMIXED
+00613F  1  8D 54 C0         sta PAGE1
+006142  1               
+006142  1  60               rts
+006143  1               .endproc
+006143  1               
+006143  1               
+006143  1               ;---------------------------------------------------------
+006143  1               .proc FLIPHIRES
+006143  1               ;---------------------------------------------------------
+006143  1               ; Call when done with the current plotting page
+006143  1               ; (selected in PLOTPAGE) and it will be shown and the
+006143  1               ; other page will be shown.
+006143  1               ;---------------------------------------------------------
+006143  1  A5 E6            lda PLOTPAGE        ; plotting on which page?
+006145  1  C9 20            cmp #PLOTPAGE1
+006147  1  F0 08            beq :+
+006149  1               
+006149  1  8D 55 C0         sta PAGE2           ; page 2 - so show it
+00614C  1  A9 20            lda #PLOTPAGE1      ; and plot on page 1
+00614E  1  85 E6            sta PLOTPAGE
+006150  1  60               rts
+006151  1               
+006151  1  8D 54 C0     :   sta PAGE1           ; page 1 - so show it
+006154  1  A9 40            lda #PLOTPAGE2      ; and plot on page 2
+006156  1  85 E6            sta PLOTPAGE
+006158  1  60               rts
+006159  1               .endproc
+006159  1               
+006159  1               
+006159  1               ;---------------------------------------------------------
+006159  1               .proc CLEARHIRES
+006159  1               ;---------------------------------------------------------
+006159  1               ; Clear hires plotting page (selected in PLOTPAGE) to
+006159  1               ; black uses ZP; not terribly efficient
+006159  1               ;---------------------------------------------------------
+006159  1  A9 00           lda #0           ; Set up ZP as a pointer into the hires page
+00615B  1  85 FA           sta ZP
+00615D  1  A5 E6           lda PLOTPAGE
+00615F  1  85 FB           sta ZP+1
+006161  1  A2 20           ldx #PAGESIZE    ; Clear this many pages
+006163  1  A9 00           lda #0           ; with black!
+006165  1  A8              tay
+006166  1  91 FA        :  sta (ZP),Y
+006168  1  C8              iny
+006169  1  D0 FB           bne :-
+00616B  1  E6 FB           inc ZP+1
+00616D  1  CA              dex
+00616E  1  D0 F6           bne :-
+006170  1  60              rts
+006171  1               .endproc
+006171  1               
+006171  1               
+006171  1               
+006171  1               ;-------------------------------------------------------------------
+006171  1               ;
+006171  1               ; Serial port routines
+006171  1               ;
+006171  1               ;-------------------------------------------------------------------
+006171  1               
+006171  1               
+006171  1               ;---------------------------------------------------------
+006171  1               .proc INITSSC
+006171  1               ;---------------------------------------------------------
+006171  1               ; Initialize the SSC; slot passed in A
+006171  1               ; [based on ADTPro]
+006171  1               ;---------------------------------------------------------
+006171  1  0A               asl                 ; Slot passed in A
+006172  1  0A               asl
+006173  1  0A               asl
+006174  1  0A               asl	    	        ; Now $S0
+006175  1  69 88            adc #$88            ; Low byte of UADATA
+006177  1  AA               tax
+006178  1  A9 0B            lda #CMND_NRDI      ; Command register: no parity, RTS on, DTR on, no interrupts
+00617A  1  9D 02 C0         sta $C002,X
+00617D  1  AC C6 61         ldy PSPEED	        ; Control register: look up by baud rate (8 data bits, 1 stop bit)
+006180  1  B9 C2 61         lda BPSCTRL,Y
+006183  1  9D 03 C0         sta $C003,X
+006186  1  8E A6 61         stx MOD_UADATA_1+1	; Modify references to
+006189  1  8E B3 61         stx MOD_UADATA_2+1	; UADATA to point at
+00618C  1  8E BF 61         stx MOD_UADATA_3+1	; correct slot (UADATA+S0)
+00618F  1  E8               inx
+006190  1  8E 9C 61         stx MOD_UASTAT_1+1	; Modify reference to
+006193  1  8E AA 61         stx MOD_UASTAT_2+1	; UASTAT to point at
+006196  1  8E B7 61         stx MOD_UASTAT_3+1  ; correct slot (UASTAT+S0)
+006199  1  60               rts
+00619A  1               
+00619A  1               .endproc
+00619A  1               
+00619A  1               
+00619A  1               ;---------------------------------------------------------
+00619A  1               SSCPUT:
+00619A  1               ;---------------------------------------------------------
+00619A  1               ; Send accumulator out the serial port
+00619A  1               ; (this is a blocking call)
+00619A  1               ; [based on ADTPro]
+00619A  1               ;---------------------------------------------------------
+00619A  1  48               pha		    ; Push A onto the stack
+00619B  1               MOD_UASTAT_1:
+00619B  1  AD 89 C0     :   lda UASTAT	; Check status bits
+00619E  1  29 70            and #$70
+0061A0  1  C9 10            cmp #$10
+0061A2  1  D0 F7            bne :-  	; Output register is full, so loop
+0061A4  1  68               pla
+0061A5  1               MOD_UADATA_1:
+0061A5  1  8D 88 C0         sta UADATA	; Put character
+0061A8  1  60               rts
+0061A9  1               
+0061A9  1               
+0061A9  1               ;---------------------------------------------------------
+0061A9  1               SSCGET:
+0061A9  1               ;---------------------------------------------------------
+0061A9  1               ; Read a character from the serial port to the accumulator
+0061A9  1               ; (this is a blocking call)
+0061A9  1               ; [based on ADTPro]
+0061A9  1               ;---------------------------------------------------------
+0061A9  1               MOD_UASTAT_2:
+0061A9  1  AD 89 C0     	lda UASTAT	; Check status bits
+0061AC  1  29 68            and #$68
+0061AE  1  C9 08            cmp #$8
+0061B0  1  D0 F7            bne SSCGET	; Input register empty, loop
+0061B2  1               MOD_UADATA_2:
+0061B2  1  AD 88 C0     	lda UADATA	; Get character
+0061B5  1  60               rts
+0061B6  1               
+0061B6  1               
+0061B6  1               ;---------------------------------------------------------
+0061B6  1               SSCHASDATA:
+0061B6  1               ;---------------------------------------------------------
+0061B6  1               ; Read a character from the serial port to the accumulator
+0061B6  1               ; (this is a blocking call)
+0061B6  1               ; [based on ADTPro]
+0061B6  1               ;---------------------------------------------------------
+0061B6  1               MOD_UASTAT_3:
+0061B6  1  AD 89 C0     	lda UASTAT	; Check status bits
+0061B9  1  29 68            and #$68
+0061BB  1  C9 08            cmp #$8
+0061BD  1  60               rts
+0061BE  1               
+0061BE  1               
+0061BE  1               ;---------------------------------------------------------
+0061BE  1               RESETSSC:
+0061BE  1               ;---------------------------------------------------------
+0061BE  1               ; Clean up serial port
+0061BE  1               ; [based on ADTPro]
+0061BE  1               ;---------------------------------------------------------
+0061BE  1               MOD_UADATA_3:
+0061BE  1  2C 88 C0     	bit UADATA
+0061C1  1  60               rts
+0061C2  1               
+0061C2  1               
+0061C2  1               
+0061C2  1               .ifdef MOUSE_SUPPORT
+0061C2  1               ;-------------------------------------------------------------------
+0061C2  1               ;
+0061C2  1               ; Mouse routines
+0061C2  1               ;
+0061C2  1               ;-------------------------------------------------------------------
+0061C2  1               
+0061C2  1               MOUSEPTR = $EB              ; Zero page location
+0061C2  1               
+0061C2  1               MOUSE_MIN_X    = $10
+0061C2  1               MOUSE_MAX_X    = $1f
+0061C2  1               MOUSE_CENTER_X = $17
+0061C2  1               MOUSE_MIN_Y    = $20
+0061C2  1               MOUSE_MAX_Y    = $2f
+0061C2  1               MOUSE_CENTER_Y = $2f
+0061C2  1               
+0061C2  1               
+0061C2  1               ;--------------------------------------------------
+0061C2  1               ; Macros for common mouse operations
+0061C2  1               ;--------------------------------------------------
+0061C2  1               
+0061C2  1               ;----------------------------------------
+0061C2  1               .macro ClampMouse   axis, min, max
+0061C2  1               ;----------------------------------------
+0061C2  1               ; axis: MOUSE_CLAMP_X or MOUSE_CLAMP_Y
+0061C2  1               ; min:  minimum value (2 byte)
+0061C2  1               ; max:  maximum value (2 byte)
+0061C2  1               ;----------------------------------------
+0061C2  1                   ; Clamp X to 0...255
+0061C2  1                   lda #<min
+0061C2  1                   sta MOUSE_CMIN_LSB
+0061C2  1                   lda #>min
+0061C2  1                   sta MOUSE_CMIN_MSB
+0061C2  1                   lda #<max
+0061C2  1                   sta MOUSE_CMAX_LSB
+0061C2  1                   lda #>max
+0061C2  1                   sta MOUSE_CMAX_MSB
+0061C2  1                   lda #axis
+0061C2  1                   jsr CLAMPMOUSE
+0061C2  1               .endmacro
+0061C2  1               
+0061C2  1               ;----------------------------------------
+0061C2  1               .macro PosMouse   px, py
+0061C2  1               ;----------------------------------------
+0061C2  1                   ldx MOUSE_SLOT
+0061C2  1                   lda #<px
+0061C2  1                   sta MOUSE_X_LSB,X
+0061C2  1                   lda #>px
+0061C2  1                   sta MOUSE_X_MSB,X
+0061C2  1                   lda #<py
+0061C2  1                   sta MOUSE_Y_LSB,X
+0061C2  1                   lda #>py
+0061C2  1                   sta MOUSE_Y_MSB,X
+0061C2  1                   jsr POSMOUSE
+0061C2  1               .endmacro
+0061C2  1               
+0061C2  1               
+0061C2  1               ;---------------------------------------------------------
+0061C2  1               .proc FINDMOUSE
+0061C2  1               ;---------------------------------------------------------
+0061C2  1               ; Find and initialize the mouse port
+0061C2  1               ;---------------------------------------------------------
+0061C2  1               
+0061C2  1               ; Reference: http://home.swbell.net/rubywand/R034MOUSEPRG.TXT
+0061C2  1               
+0061C2  1                   sei                     ; No interrupts while we're getting set up
+0061C2  1               ;
+0061C2  1               ; Step 1: Find the mouse card by scanning slots for ID bytes
+0061C2  1               ;
+0061C2  1               
+0061C2  1                   ldy #MAX_SLOT           ; Start search in slot 7
+0061C2  1               
+0061C2  1               TESTSLOT:
+0061C2  1                   sty MOUSE_SLOT          ; Save for later
+0061C2  1                   tya
+0061C2  1                   clc
+0061C2  1                   adc #>SLOT_BASE         ; Firmware is $c0 + slot
+0061C2  1                   sta MOD_MOUSE_ID + 2    ; Update msb of signature test
+0061C2  1                   ldx #MOUSEID_MAX        ; This many signature bytes
+0061C2  1               
+0061C2  1               TESTID:
+0061C2  1                   lda MOUSEID_ADDR,x
+0061C2  1                   sta MOD_MOUSE_ID + 1    ; Update lsb of signature test
+0061C2  1               MOD_MOUSE_ID:
+0061C2  1                   lda SLOT_BASE
+0061C2  1                   cmp MOUSEID_VAL,x       ; Does it match the signature?
+0061C2  1                   bne NOMATCH             ; Nope - try the next slot
+0061C2  1                   dex                     ; Yes! Keep testing
+0061C2  1                   bpl TESTID              ; Fall through if all done
+0061C2  1                   jmp FOUND_MOUSE
+0061C2  1               
+0061C2  1               NOMATCH:
+0061C2  1                   dey                     ; Didn't match
+0061C2  1                   bne TESTSLOT            ; Keep looking until slot 0
+0061C2  1                   sty MOUSE_SLOT          ; Oops, no mouse - make a note
+0061C2  1                   rts                     ; and bail
+0061C2  1               
+0061C2  1               ;
+0061C2  1               ; Step 2: Set up indirect calling routines
+0061C2  1               ;
+0061C2  1               
+0061C2  1               FOUND_MOUSE:
+0061C2  1                   ; Slot is in y
+0061C2  1               
+0061C2  1                   tya
+0061C2  1                   ora #>SLOT_BASE         ; Compute $Cn - needed for
+0061C2  1                   sta MOUSEPTR+1          ; MSB of MOUSEPTR ($Cn00)
+0061C2  1                   sta TOMOUSE_Cn          ; X register before firmware calls
+0061C2  1                   sta TOMOUSE_msb         ; MSB of firmware calls
+0061C2  1               
+0061C2  1                   lda #0
+0061C2  1                   sta MOUSEPTR            ; LSB of MOUSEPTR ($Cn00)
+0061C2  1               
+0061C2  1                   tya
+0061C2  1                   asl                     ; Compute $n0 - needed for
+0061C2  1                   asl
+0061C2  1                   asl
+0061C2  1                   asl
+0061C2  1                   sta TOMOUSE_n0          ; Y register before firmware calls
+0061C2  1               
+0061C2  1               ;
+0061C2  1               ; Step 3: Configure the mouse card
+0061C2  1               ;
+0061C2  1               
+0061C2  1               ; Initialize the mouse for use
+0061C2  1                   jsr INITMOUSE       ; reset, clamp to 0-1023 x/y
+0061C2  1                   lda #1              ; mouse on, no interrupts
+0061C2  1                   jsr SETMOUSE        ; TODO: test carry bit result (set = error)
+0061C2  1               ;
+0061C2  1               ; Since we want deltas, clamp and center
+0061C2  1               ;
+0061C2  1                   ClampMouse  MOUSE_CLAMP_X, MOUSE_MIN_X, MOUSE_MAX_X
+0061C2  1                   ClampMouse  MOUSE_CLAMP_Y, MOUSE_MIN_Y, MOUSE_MAX_Y
+0061C2  1                   PosMouse MOUSE_CENTER_X, MOUSE_CENTER_Y
+0061C2  1               
+0061C2  1                   cli                 ; Enable interrupts so mouse can function
+0061C2  1               
+0061C2  1                   rts
+0061C2  1               
+0061C2  1               .endproc
+0061C2  1               
+0061C2  1               
+0061C2  1               ;--------------------------------------------------
+0061C2  1               ; Indirect jump table for mouse firmware routines
+0061C2  1               ;--------------------------------------------------
+0061C2  1               
+0061C2  1               SETMOUSE:       ldy #$12
+0061C2  1                               jmp GOMOUSE
+0061C2  1               SERVEMOUSE:     ldy #$13
+0061C2  1                               jmp GOMOUSE
+0061C2  1               READMOUSE:      ldy #$14
+0061C2  1                               jmp GOMOUSE
+0061C2  1               CLEARMOUSE:     ldy #$15
+0061C2  1                               jmp GOMOUSE
+0061C2  1               POSMOUSE:       ldy #$16
+0061C2  1                               jmp GOMOUSE
+0061C2  1               CLAMPMOUSE:     ldy #$17
+0061C2  1                               jmp GOMOUSE
+0061C2  1               HOMEMOUSE:      ldy #$18
+0061C2  1                               jmp GOMOUSE
+0061C2  1               INITMOUSE:      ldy #$19
+0061C2  1                               jmp GOMOUSE
+0061C2  1               
+0061C2  1               ;--------------------------------------------------
+0061C2  1               .proc GOMOUSE
+0061C2  1               ;--------------------------------------------------
+0061C2  1                   tax                 ; Preserve the value in A
+0061C2  1                   lda (MOUSEPTR),Y    ; Get the routine entry point
+0061C2  1                   sta TOMOUSE_lsb     ; Patch the JMP instruction
+0061C2  1                   txa                 ; Restore the value in A
+0061C2  1               .endproc
+0061C2  1                   ; fall through
+0061C2  1               
+0061C2  1               ; The following operand bytes must be patched by the
+0061C2  1               ; initialization code which detects the mouse.
+0061C2  1               
+0061C2  1               BANK       = $C054
+0061C2  1               
+0061C2  1               TOMOUSE:
+0061C2  1                   ldx #$C1            ; Set up slot in $Cn form in X
+0061C2  1                   ldy #$10            ; Set up slot in $n0 form in Y
+0061C2  1                   php                 ; Save interrupt state
+0061C2  1                   sei                 ; No interrupts while calling
+0061C2  1                   bit BANK
+0061C2  1                   jsr SLOT_BASE       ; Go to the mouse routine
+0061C2  1                   plp                 ; Restore interrupt state
+0061C2  1                   rts
+0061C2  1               
+0061C2  1               TOMOUSE_Cn   = TOMOUSE + 1
+0061C2  1               TOMOUSE_n0   = TOMOUSE + 3
+0061C2  1               TOMOUSE_lsb  = TOMOUSE + 10
+0061C2  1               TOMOUSE_msb  = TOMOUSE + 11
+0061C2  1               
+0061C2  1               
+0061C2  1               ; TODO: Turn this into a proper delta-sending routine
+0061C2  1               
+0061C2  1               ;--------------------------------------------------
+0061C2  1               .proc FOOMOUSE
+0061C2  1               ;--------------------------------------------------
+0061C2  1               ;
+0061C2  1               ;--------------------------------------------------
+0061C2  1                   txa                 ; save x
+0061C2  1                   pha
+0061C2  1                   tya                 ; save y
+0061C2  1                   pha
+0061C2  1               
+0061C2  1                   jsr READMOUSE
+0061C2  1               
+0061C2  1                   jmp DONE
+0061C2  1               
+0061C2  1                   ldx MOUSE_SLOT
+0061C2  1               
+0061C2  1                   lda MOUSE_X_LSB,x
+0061C2  1                   sta LAST_MX
+0061C2  1               
+0061C2  1                   lda MOUSE_Y_LSB,x
+0061C2  1                   sta LAST_MY
+0061C2  1               
+0061C2  1                   lda LAST_MX
+0061C2  1                   cmp #MOUSE_CENTER_X
+0061C2  1                   bne SEND
+0061C2  1               
+0061C2  1                   lda LAST_MY
+0061C2  1                   cmp #MOUSE_CENTER_Y
+0061C2  1                   beq DONE
+0061C2  1               
+0061C2  1               SEND:
+0061C2  1                   lda LAST_MX
+0061C2  1                   ora #SIS_MX
+0061C2  1                   jsr SSCPUT
+0061C2  1                   lda LAST_MY
+0061C2  1                   ora #SIS_MY
+0061C2  1                   jsr SSCPUT
+0061C2  1               
+0061C2  1                   PosMouse MOUSE_CENTER_X, MOUSE_CENTER_Y
+0061C2  1               
+0061C2  1               DONE:
+0061C2  1                   pla                 ; restore y
+0061C2  1                   tay
+0061C2  1                   pla                 ; restore x
+0061C2  1                   tax
+0061C2  1                   rts
+0061C2  1               
+0061C2  1               .endproc
+0061C2  1               
+0061C2  1               .endif ; MOUSE_SUPPORT
+0061C2  1               
+0061C2  1               
+0061C2  1               ;-------------------------------------------------------------------
+0061C2  1               ;
+0061C2  1               ; Lookup Tables and Variable Storage
+0061C2  1               ;
+0061C2  1               ;-------------------------------------------------------------------
+0061C2  1               
+0061C2  1               ; Lookup table for UACTRL register, by baud rate
+0061C2  1               
+0061C2  1  16 1E 1F 10  BPSCTRL:	.byte $16,$1E,$1F,$10	; 300, 9600, 19200, 115k (with 8 data bits, 1 stop bit, no echo)
+0061C6  1               .enum
+0061C6  1                   BPS_300
+0061C6  1                   BPS_9600
+0061C6  1                   BPS_19200
+0061C6  1                   BPS_115k
+0061C6  1               .endenum
+0061C6  1               CMND_NRDI    = $0B    ; Command: no parity, RTS on, DTR on, no interrupts
+0061C6  1               
+0061C6  1               
+0061C6  1               ; Application configuration
+0061C6  1  03           PSPEED:     .byte BPS_115k  ; Hardcoded for Apple IIc (TODO: Allow configuration)
+0061C7  1  02           PSLOT:      .byte 2         ; Hardcoded for Apple IIc (TODO: Allow configuration)
+0061C8  1  00           PEXIT:      .byte 0         ; Set when it's time to exit (Not Yet Implemented)
+0061C9  1               
+0061C9  1               
+0061C9  1               ; Keyboard state
+0061C9  1  00           LASTKB:     .byte 0
+0061CA  1  00           LASTOA:     .byte 0
+0061CB  1  00           LASTCA:     .byte 0
+0061CC  1               
+0061CC  1               .ifdef PADDLE_SUPPORT
+0061CC  1               
+0061CC  1               ; Paddle state
+0061CC  1  00           LASTP0:     .byte 0
+0061CD  1  00           LASTP1:     .byte 0
+0061CE  1               
+0061CE  1               .endif ; PADDLE_SUPPORT
+0061CE  1               
+0061CE  1               
+0061CE  1               .ifdef MOUSE_SUPPORT
+0061CE  1               
+0061CE  1               ; Mouse
+0061CE  1               MOUSE_SLOT: .byte 0         ; mouse slot, or 0 if none
+0061CE  1               LAST_MX:    .byte $7f
+0061CE  1               LAST_MY:    .byte $7f
+0061CE  1               
+0061CE  1               ; Mouse ID bytes
+0061CE  1               MOUSEID_MAX     = 4
+0061CE  1               MOUSEID_ADDR:   .byte $05, $07, $0b, $0c, $fb
+0061CE  1               MOUSEID_VAL:    .byte $38, $18, $01, $20, $d6
+0061CE  1               
+0061CE  1               .endif ; MOUSE_SUPPORT
+0061CE  1               
+0061CE  1               

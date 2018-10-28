@@ -1,12 +1,59 @@
 <!doctype html>
-<title>Screen Capture Demo</title>
+<title>vnIIc</title>
+<link href="https://fonts.googleapis.com/css?family=Audiowide" rel="stylesheet">
 <style>
 video, canvas { border: 2px dotted black; }
+
+h1, h2, h3 { font-family: Audiowide; }
+h1 { font-size: 64px; margin: 0;}
+
+#title { background-color: #d0d0d0; height: 128px; margin: 20px 0; padding: 10px; }
+
+body { font-family: sans-serif; margin: 0 20px;}
 </style>
 
+<div id=title>
+<h1>vn//c
+<img style="float: left; margin-right: 24px;" src="res/icon128.png">
+</h1>
+<div>
+Desktop streaming to an Apple II with Super Serial Card
+</div>
+</div>
+
 <canvas id=quant width=140 height=192 style="width: 280px; height: 192px;"></canvas>
-<br>
+
+<div>
+<button id=start>Start Capturing</button>
 <button id=save>Save</button>
 <button id=bootstrap>Bootstrap</button>
+</div>
 
 <script src="server.js"></script>
+
+
+<h2>About vnIIc</h2>
+<p>
+The name "vnIIc" is a play on <a target=_blank
+href="https://en.wikipedia.org/wiki/Virtual_Network_Computing">VNC
+("Virtual Network Computing")</a> and the <a target=_blank
+href="https://en.wikipedia.org/wiki/Apple_IIc">Apple IIc</a> for humor
+purposes, but the application does not use the VNC or <a target=_blank
+href="https://en.wikipedia.org/wiki/RFB_protocol">RFB</a> protocols.
+Apple IIc is a trademark of Apple Computer, Inc. VNC and RFB are
+registered trademarks of RealVNC Ltd.
+</p>
+
+<p>
+The first version was a Windows application, written in 2008. See a <a
+target=_blank href="https://www.youtube.com/watch?v=vAZHJa91JHk">video
+demonstration on YouTube</a>.
+</p>
+
+<p>
+Thanks to: Michael J. Mahon, Nick Westgate, David Wilson, David
+Schmenk, David Schmidt and the rest of the <a target=_blank
+href="https://groups.google.com/forum/#!forum/comp.sys.apple2.programmer">comp.sys.apple2.programmer</a>
+gang!
+</p>
+</div>

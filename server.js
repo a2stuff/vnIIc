@@ -1,5 +1,7 @@
 const $ = document.querySelector.bind(document);
 
+let dither_factor = 0.9;
+
 const palette = [
   /* Black1 */ [0x00, 0x00, 0x00],
   /* Green  */ [0x2f, 0xbc, 0x1a],
@@ -10,6 +12,11 @@ const palette = [
   /* Blue   */ [0x2f, 0x95, 0xe5],
   /* White2 */ [0xff, 0xff, 0xff]
 ];
+
+$('#dither').addEventListener('input', e => {
+  const input = e.target;
+  dither_factor = (input.value - input.min) / (input.max - input.min);
+});
 
 let hires_buffer = new Uint8Array(8192);
 
@@ -26,7 +33,10 @@ $('#save').addEventListener('click', e => {
 });
 
 // Start capturing the desktop.
+let interval_id;
 $('#start').addEventListener('click', async e => {
+  clearInterval(interval_id);
+
   try {
     const mediaStream = await navigator.getDisplayMedia({video:true});
     const vid = document.createElement('video');
@@ -44,7 +54,7 @@ $('#start').addEventListener('click', async e => {
 
     const indexes = new Array(can.width * can.height);
 
-    setInterval(() => {
+    interval_id = setInterval(() => {
       ctx.drawImage(vid, 0, 0, can.width, can.height);
 
       const imagedata = ctx.getImageData(0, 0, can.width, can.height);
@@ -57,7 +67,7 @@ $('#start').addEventListener('click', async e => {
     }, 500);
 
   } catch (e) {
-    console.warn(`Error: ${e.name} - ${e.message}`);
+    alert('getDisplayMedia support or access denied');
   }
 });
 
@@ -119,9 +129,15 @@ function quantize(imagedata, indexes) {
       const pi = palette[index];
 
       // Calculate error
-      const err_r = data[i] - pi[0];
-      const err_g = data[i+1] - pi[1];
-      const err_b = data[i+2] - pi[2];
+      let err_r = (data[i] - pi[0]);
+      let err_g = (data[i+1] - pi[1]);
+      let err_b = (data[i+2] - pi[2]);
+
+      // Arbitrary damping factor to reduce noise at the cost of
+      // fidelity.
+      err_r *= dither_factor;
+      err_g *= dither_factor;
+      err_b *= dither_factor;
 
       // Update pixel
       data[i] = pi[0];

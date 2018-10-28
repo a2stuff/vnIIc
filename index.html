@@ -1,15 +1,26 @@
 <!doctype html>
 <title>vnIIc</title>
-<link href="https://fonts.googleapis.com/css?family=Audiowide" rel="stylesheet">
+<link rel=icon hres="res/icon128.png">
+<link rel=stylesheet href="https://fonts.googleapis.com/css?family=Audiowide">
 <style>
-video, canvas { border: 2px dotted black; }
-
 h1, h2, h3 { font-family: Audiowide; }
 h1 { font-size: 64px; margin: 0;}
+h2 { margin-bottom: 4px; }
+p { margin-top: 4px; }
+
+#quant { border: 8px gray ridge; padding: 10px; background-color: #202020; }
 
 #title { background-color: #d0d0d0; height: 128px; margin: 20px 0; padding: 10px; }
 
-body { font-family: sans-serif; margin: 0 20px;}
+body {
+  font-family: sans-serif;
+  margin: 0 auto;
+  width: 600px;
+
+}
+
+section { font-size: 80%; }
+
 </style>
 
 <div id=title>
@@ -27,11 +38,13 @@ Desktop streaming to an Apple II with Super Serial Card
 <button id=start>Start Capturing</button>
 <button id=save>Save</button>
 <button id=bootstrap>Bootstrap</button>
+<input id=dither type=range min=0 max=100 value=90>
 </div>
 
 <script src="server.js"></script>
 
 
+<section id=about>
 <h2>About vnIIc</h2>
 <p>
 The name "vnIIc" is a play on <a target=_blank
@@ -56,4 +69,5 @@ Schmenk, David Schmidt and the rest of the <a target=_blank
 href="https://groups.google.com/forum/#!forum/comp.sys.apple2.programmer">comp.sys.apple2.programmer</a>
 gang!
 </p>
+</section>
 </div>

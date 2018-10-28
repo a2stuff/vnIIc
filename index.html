@@ -53,7 +53,7 @@ const palette = [
   }
 })();
 
-function distance(r1,g1,b1,r2,b2,g2) {
+function distance(r1,g1,b1,r2,g2,b2) {
   const dr = r1 - r2;
   const dg = g1 - g2;
   const db = b1 - b2;
@@ -68,31 +68,63 @@ function quantize(imagedata) {
     hash[rgb] = i;
   }
 
-// Nearest Neighbor
-  for (let i = 0; i < imagedata.data.length; i += 4) {
-    const r = imagedata.data[i];
-    const g = imagedata.data[i+1];
-    const b = imagedata.data[i+2];
+  // Floyd-Steinberg
+  function offset(x, y) {
+    return 4 * (x + y * imagedata.width);
+  }
 
-    const rgb = (r << 16) | (g << 8) | b;
-    let index = hash[rgb];
-    if (index === undefined) {
-      let dist;
-      for (let p = 0; p < palette.length; ++p) {
-        const entry = palette[p];
-        const d = distance(r,g,b, entry[0], entry[1], entry[2]);
-        if (dist === undefined || d < dist) {
-          dist = d;
-          index = p;
+  function err(x, y, er, eg, eb) {
+    if (x < 0 || x >= imagedata.width || y < 0 || y >= imagedata.height)
+      return;
+    const i = offset(x, y);
+    const data = imagedata.data;
+    data[i + 0] += er;
+    data[i + 1] += eg;
+    data[i + 2] += eb;
+  }
+
+  const data = imagedata.data;
+  for (let y = 0; y < imagedata.height; ++y) {
+    for (let x = 0; x < imagedata.width; ++x) {
+      const i = offset(x, y);
+
+      const r = data[i];
+      const g = data[i+1];
+      const b = data[i+2];
+
+      // Find closest in palette.
+      const rgb = (r << 16) | (g << 8) | b;
+      let index = hash[rgb];
+      if (index === undefined) {
+        let dist;
+        for (let p = 0; p < palette.length; ++p) {
+          const entry = palette[p];
+          const d = distance(r,g,b, entry[0], entry[1], entry[2]);
+          if (dist === undefined || d < dist) {
+            dist = d;
+            index = p;
+          }
         }
+        hash[rgb] = index;
       }
-      hash[rgb] = index;
-    }
+      const pi = palette[index];
 
-    const pi = palette[index];
-    imagedata.data[i] = pi[0];
-    imagedata.data[i+1] = pi[1];
-    imagedata.data[i+2] = pi[2];
+      // Calculate error
+      const err_r = data[i] - pi[0];
+      const err_g = data[i+1] - pi[1];
+      const err_b = data[i+2] - pi[2];
+
+      // Update pixel
+      data[i] = pi[0];
+      data[i+1] = pi[1];
+      data[i+2] = pi[2];
+
+      // Distribute error
+      err(x + 1, y,     err_r * 7/16, err_g * 7/16, err_b * 7/16);
+      err(x - 1, y + 1, err_r * 3/16, err_g * 3/16, err_b * 3/16);
+      err(x,     y + 1, err_r * 5/16, err_g * 5/16, err_b * 5/16);
+      err(x + 1, y + 1, err_r * 1/16, err_g * 1/16, err_b * 1/16);
+    }
   }
 }
 

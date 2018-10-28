@@ -1,11 +1,11 @@
 <!doctype html>
 <title>vnIIc</title>
-<link rel=icon hres="res/icon128.png">
+<link rel=icon href="res/icon128.png">
 <link rel=stylesheet href="https://fonts.googleapis.com/css?family=Audiowide">
 <style>
 h1, h2, h3 { font-family: Audiowide; }
 h1 { font-size: 64px; margin: 0;}
-h2 { margin-bottom: 4px; }
+h2,h3 { margin-bottom: 4px; }
 p { margin-top: 4px; }
 
 #quant { border: 8px gray ridge; padding: 10px; background-color: #202020; }
@@ -32,14 +32,32 @@ Desktop streaming to an Apple II with Super Serial Card
 </div>
 </div>
 
-<canvas id=quant width=140 height=192 style="width: 280px; height: 192px;"></canvas>
+<section id=requirements>
+<h2>Requirements</h2>
+<ul>
+  <li>Modern browser with <a target=_blank href="https://w3c.github.io/mediacapture-screen-share/">Screen Capture</a> and <a target=_blank href="https://wicg.github.io/serial/">Web Serial</a> support. (Circa late 2018, both are highly experimental.)
+  <li>Apple II with Super Serial Card in slot 2. (e.g. Apple IIc, Apple IIgs, Laser 128)
+  <li>Serial connection between your modern computer and the Apple, such as via a <a target=_blank href="https://en.wikipedia.org/wiki/Null_modem">null-modem</a> cable and USB to RS-232 adapter from <a target=_blank href="http://retrofloppy.com/products/">RetroFloppy</a>.
+</ul>
+</section>
 
-<div>
-<button id=start>Start Capturing</button>
-<button id=save>Save</button>
-<button id=bootstrap>Bootstrap</button>
-<input id=dither type=range min=0 max=100 value=90>
-</div>
+<canvas id=quant width=140 height=192 style="width: 280px; height: 192px; float: right;"></canvas>
+
+<section id=steps>
+<h3>Step 1:</h3>
+<button id=start>Start Capturing</button> desktop or application window
+<h3>Step 2:</h3>
+<button id=bootstrap
+        title="Send the vnIIc client code to the Apple II over the selected COM port. The code is streamed down as if a user is typing. You will be prompted to enter commands on the Apple II to initiate the transfer.">Bootstrap Serial Connection</button> to Apple II
+<h3>Step 3:</h3>
+<button id=stream>Start Streaming</button> - not implemented yet
+
+
+<h3>Extras:</h3>
+<label><button id=save>Save Frame</button> as an 8192-byte hires image file</label><br>
+<label
+title="Select the level to which 'dithering' or speckling is used to approximate colors that can't be displayed on the Apple II display.  A lower value means more solid colors but a poorer approximation. A higher value means a better approximation but more speckling.">Adjust dither: <input id=dither type=range min=0 max=100 value=90></label>
+</section>
 
 <script src="server.js"></script>
 

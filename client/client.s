@@ -25,10 +25,10 @@ PAGESIZE        := $20            ; Size of hi-res screen in pages
 ;;; ROM routines
 ;;;---------------------------------------------------------
 
-PREAD   := $FB1E                 ; Monitor paddle reading routine, call
+PREAD   := $FB1E                  ; Monitor paddle reading routine, call
                                 ; with paddle # in X, returns value in Y
 
-HCLR    := $F3F2                     ; Clear current hires screen to black
+HCLR    := $F3F2                      ; Clear current hires screen to black
 
 ;;;---------------------------------------------------------
 ;;; Other

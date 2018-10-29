@@ -1,75 +1,31 @@
 PADDLE_SUPPORT = 1
 ;;; MOUSE_SUPPORT  = 1
 
-;;;---------------------------------------------------------
-;;; Super Serial constants/locations
-;;;---------------------------------------------------------
-
-;;; These get incremented by the slot where they appear
-UACTRL   = $C08B   ; Control Register
-UACMND   = $C08A   ; Command Register
-UASTAT   = $C089   ; Status Register
-UADATA   = $C088   ; Data Register - incoming and outgoing data
-
+.include "apple2.inc"
 
 ;;;---------------------------------------------------------
 ;;; Hi-res graphics constants/locations
 ;;;---------------------------------------------------------
 
-PLOTPAGE  = $E6 ; Active hires plotting page (Applesoft)
-PLOTPAGE1 = $20
-PLOTPAGE2 = $40
-PAGESIZE  = $20 ; Size of hi-res screen in pages
-
-
-CLRTEXT  = $C050 ;display graphics
-SETTEXT  = $C051 ;display text
-CLRMIXED = $C052 ;clear mixed mode- enable full graphics
-SETMIXED = $C053 ;enable graphics/text mixed mode
-PAGE1    = $C054 ;select text/graphics page1
-PAGE2    = $C055 ;select text/graphics page2
-CLRHIRES = $C056 ;select Lo-res
-SETHIRES = $C057 ;select Hi-res
-
+PLOTPAGE        := $E6          ; Active hires plotting page (Applesoft)
+PLOTPAGE1       := $20
+PLOTPAGE2       := $40
+PAGESIZE        := $20          ; Size of hi-res screen in pages
 
 ;;;---------------------------------------------------------
-;;; Keyboard input constants/locations
+;;; ROM routines
 ;;;---------------------------------------------------------
 
-KEYBD     =   $C000 ; key down in bit 7; key code in lower bits
-STROBE    =   $C010 ; write to clear key down state
-OPNAPPLE  =   $C061 ; open apple (command) key data (read)
-CLSAPPLE  =   $C062 ; closed apple (option) key data (read)
-PB2       =   $C063 ; Paddle button 2 (read)
-PB3       =   $C060 ; Paddle button 3 (read)
-
-
-;;;---------------------------------------------------------
-;;; Paddle/Joystick constants/locations/routines
-;;;---------------------------------------------------------
-
-PADDLE0 =  $C064    ; bit 7 = status of pdl-0 timer (read)
-PADDLE1 =  $C065    ; bit 7 = status of pdl-1 timer (read)
-PADDLE2 =  $C066    ; bit 7 = status of pdl-2 timer (read)
-PADDLE3 =  $C067    ; bit 7 = status of pdl-3 timer (read)
-PDLTRIG =  $C070    ; trigger paddles
-
-PREAD   =  $FB1E    ; Monitor paddle reading routine, call
-                    ; with paddle # in X, returns value in Y
-
-
+PREAD   :=      $FB1E   ; Monitor paddle reading routine, call
+                        ; with paddle # in X, returns value in Y
 
 ;;;---------------------------------------------------------
 ;;; Other
 ;;;---------------------------------------------------------
 
-SLOT_CASE =   $c000 ; Firmware for slots are at $cx00
-MAX_SLOT  =   7     ; Maximum slot # on an Apple II
+MAX_SLOT  :=   7     ; Maximum slot # on an Apple II
 
-ZP        =   $FA   ; Write cursor location on zero page
-ESCAPE    =   $80   ; Unused image data byte (all black2)
-ESCAPE2   =   $FF   ; Unused image data byte (all white2)
-
+ZP_PTR    :=   $FA   ; Write cursor location on zero page
 
 ;;;---------------------------------------------------------
 ;;; Generic Macros
@@ -97,9 +53,9 @@ ESCAPE2   =   $FF   ; Unused image data byte (all white2)
 
 
 ;;;-------------------------------------------------------------------
-;
+;;;
 ;;; Application-level logic
-;
+;;;
 ;;;-------------------------------------------------------------------
 
 
@@ -111,6 +67,29 @@ ESCAPE2   =   $FF   ; Unused image data byte (all white2)
 .ifdef MOUSE_SUPPORT
         .include "mouse.inc"
 .endif ; MOUSE_SUPPORT
+
+
+;;;-------------------------------------------------------------------
+;;; Variables
+;;;-------------------------------------------------------------------
+
+;;; Application configuration
+PSPEED:     .byte SSC::BPS_115k  ; Hardcoded for Apple IIc (TODO: Allow configuration)
+PSLOT:      .byte 2         ; Hardcoded for Apple IIc (TODO: Allow configuration)
+PEXIT:      .byte 0         ; Set when it's time to exit (Not Yet Implemented)
+
+;;; Keyboard state
+LASTKB:     .byte 0
+LASTOA:     .byte 0
+LASTCA:     .byte 0
+
+.ifdef PADDLE_SUPPORT
+
+;;; Paddle state
+LASTP0:     .byte 0
+LASTP1:     .byte 0
+
+.endif ; PADDLE_SUPPORT
 
 
 ;;;---------------------------------------------------------
@@ -133,16 +112,16 @@ ESCAPE2   =   $FF   ; Unused image data byte (all white2)
 ;;; Clean up and exit app
 ;;;---------------------------------------------------------
     jsr SSC::Reset
-    sta PAGE1
-    sta SETTEXT
+    sta LOWSCR
+    sta TXTSET
     rts
 .endproc
 
 
 ;;;-------------------------------------------------------------------
-;
+;;;
 ;;; Main loop functionality
-;
+;;;
 ;;;-------------------------------------------------------------------
 
 
@@ -166,27 +145,27 @@ ESCAPE2   =   $FF   ; Unused image data byte (all white2)
 .proc ReceivePage
 ;;;---------------------------------------------------------
 ;;; Pull a hi-res page down over serial
-;
+;;;
 ;;; Protocol is:
 ;;;  * Recieve 256 bytes (graphic data)
 ;;;  * Send 1 byte (input state)
 ;;;---------------------------------------------------------
 
     lda #0        ; set up write pointer
-    sta ZP
+    sta ZP_PTR
     lda PLOTPAGE
-    sta ZP+1
+    sta ZP_PTR+1
     ldx #PAGESIZE ; plan to receive this many pages
     ldy #0
 
 :   jsr SSC::Get  ; TODO: look for escape codes in the sequence
-    sta (ZP),Y
+    sta (ZP_PTR),Y
     iny
     bne :-       ; Do a full page...
 
     jsr SendInputState ; brief moment to send data back upstream
 
-    inc ZP+1
+    inc ZP_PTR+1
     dex
     bne :-       ; ...as many pages as we need
     rts
@@ -194,29 +173,29 @@ ESCAPE2   =   $FF   ; Unused image data byte (all white2)
 
 
 ;;;-------------------------------------------------------------------
-;
+;;;
 ;;; Input device routines
-;
+;;;
 ;;;-------------------------------------------------------------------
 ;;; Protocol:
 ;;;  $7f - $ff - key down, ASCII code + $80
 ;;;  otherwise, a transition:
-;
+;;;
     SIS_KBUP    = $00   ; Key up
     SIS_OADOWN  = $01   ; Open Apple transitioned to down
     SIS_OAUP    = $02   ; Open Apple transitioned to up
     SIS_CADOWN  = $03   ; Closed Apple transitioned to down
     SIS_CAUP    = $04   ; Closed Apple transitioned to up
-;
+;;;
 ;;;  $05 - $0f : reserved
-;
+;;;
     SIS_MX      = $10   ; Mouse X high nibble
     SIS_MY      = $20   ; Mouse Y high nibble
     SIS_PDL0    = $30   ; Paddle 0 high nibble
     SIS_PDL1    = $40   ; Paddle 1 high nibble
-;
+;;;
 ;;;  $50 - $7e : reserved
-;
+;;;
     SIS_SYNC    = $7f
 
 ;;;---------------------------------------------------------
@@ -259,7 +238,7 @@ ESCAPE2   =   $FF   ; Unused image data byte (all white2)
 ;;;---------------------------------------------------------
 ;;; Send keyboard joystick and/or mouse state over the
 ;;; serial port
-;
+;;;
 ;;; Algorithm:
 ;;; - Send key state (if it changed)
 ;;; - otherwise send open-apple state (if it changed)
@@ -275,22 +254,22 @@ ESCAPE2   =   $FF   ; Unused image data byte (all white2)
 ;;;--------------------------------------
 ;;; Send key state, if it changed
 
-;;; NOTE: Can't use STROBE to detect key up -> key down transition
+;;; NOTE: Can't use KBDSTRB to detect key up -> key down transition
 ;;; since the msb can change before the key code. Instead, consider
 ;;; these cases:
-;
-;;;  OLD STATE    KEYBD     STROBE     RESULT
+;;;
+;;;  OLD STATE    KBD       KBDSTRB    RESULT
 ;;;   Up           Up        -          No-op
 ;;;   Up           Down      -          Save and send key down
 ;;;   Down         -         Up         Save and send key up
 ;;;   Down         -         Down       Save and send key ONLY if different
-;
+;;;
 
     lda LASTKB
     bne KEY_WAS_DOWN
 
 KEY_WAS_UP:
-    lda KEYBD           ; Read keyboard
+    lda KBD           ; Read keyboard
     bpl END_KEY         ; - still up
     sta LASTKB          ; Down, so save it
     jsr SSC::Put          ; and send it
@@ -299,14 +278,14 @@ KEY_WAS_UP:
 KEY_WAS_DOWN:
     ; key was down - strobe should match
     ; unless the key changed or was released
-    lda STROBE
-    bmi STROBE_DOWN
-STROBE_UP:
+    lda KBDSTRB
+    bmi KBDSTRB_DOWN
+KBDSTRB_UP:
     lda #SIS_KBUP       ; Key was released
     sta LASTKB          ; so save it
     jsr SSC::Put          ; and send it
     jmp DONE
-STROBE_DOWN:
+KBDSTRB_DOWN:
     cmp LASTKB          ; Same key as last time?
     beq END_KEY         ; - no change
     sta LASTKB          ; New key, so save it
@@ -319,10 +298,10 @@ END_KEY:
 ;;; Send Open Apple state, if it changed
 
 ;;; TODO: Can simplify this code if we make the high bits the same
-;;; for both OA states and bit = 0 down: lda OPNAPPLE ; ROL ; LDA #0 ; ROL ; ORA #signature
+;;; for both OA states and bit = 0 down: lda BUTN0 ; ROL ; LDA #0 ; ROL ; ORA #signature
 
 TEST_OA:
-    lda OPNAPPLE        ; Test Open Apple state
+    lda BUTN0        ; Test Open Apple state
     bmi OA_IS_DOWN
 OA_IS_UP:
     lda #SIS_OAUP
@@ -345,7 +324,7 @@ END_OA:
 ;;; Send Closed Apple state, if it changed
 
 TEST_CA:
-    lda CLSAPPLE        ; Has the Open Apple/Button 1 value changed?
+    lda BUTN1             ; Has the Open Apple/Button 1 value changed?
     bmi CA_IS_DOWN
 CA_IS_UP:
     lda #SIS_CAUP
@@ -430,9 +409,9 @@ DONE:
 
 
 ;;;-------------------------------------------------------------------
-;
+;;;
 ;;; Hi-res graphics routines
-;
+;;;
 ;;;-------------------------------------------------------------------
 
 ;;;---------------------------------------------------------
@@ -445,10 +424,10 @@ DONE:
     jsr ClearHires
 
     jsr FlipHires    ; then show it and flip to 2
-    sta SETHIRES
-    sta CLRTEXT
-    sta CLRMIXED
-    sta PAGE1
+    sta HIRES
+    sta TXTCLR
+    sta MIXCLR
+    sta LOWSCR
 
     rts
 .endproc
@@ -465,12 +444,12 @@ DONE:
     cmp #PLOTPAGE1
     beq :+
 
-    sta PAGE2           ; page 2 - so show it
+    sta HISCR           ; page 2 - so show it
     lda #PLOTPAGE1      ; and plot on page 1
     sta PLOTPAGE
     rts
 
-:   sta PAGE1           ; page 1 - so show it
+:   sta LOWSCR           ; page 1 - so show it
     lda #PLOTPAGE2      ; and plot on page 2
     sta PLOTPAGE
     rts
@@ -481,60 +460,20 @@ DONE:
 .proc ClearHires
 ;;;---------------------------------------------------------
 ;;; Clear hires plotting page (selected in PLOTPAGE) to
-;;; black uses ZP; not terribly efficient
+;;; black uses ZP_PTR; not terribly efficient
 ;;;---------------------------------------------------------
-   lda #0           ; Set up ZP as a pointer into the hires page
-   sta ZP
+   lda #0           ; Set up ZP_PTR as a pointer into the hires page
+   sta ZP_PTR
    lda PLOTPAGE
-   sta ZP+1
+   sta ZP_PTR+1
    ldx #PAGESIZE    ; Clear this many pages
    lda #0           ; with black!
    tay
-:  sta (ZP),Y
+:  sta (ZP_PTR),Y
    iny
    bne :-
-   inc ZP+1
+   inc ZP_PTR+1
    dex
    bne :-
    rts
 .endproc
-
-
-
-
-;;;-------------------------------------------------------------------
-;
-;;; Lookup Tables and Variable Storage
-;
-;;;-------------------------------------------------------------------
-
-;;; Lookup table for UACTRL register, by baud rate
-
-BPSCTRL:	.byte $16,$1E,$1F,$10	; 300, 9600, 19200, 115k (with 8 data bits, 1 stop bit, no echo)
-.enum
-    BPS_300
-    BPS_9600
-    BPS_19200
-    BPS_115k
-.endenum
-CMND_NRDI    = $0B    ; Command: no parity, RTS on, DTR on, no interrupts
-
-
-;;; Application configuration
-PSPEED:     .byte BPS_115k  ; Hardcoded for Apple IIc (TODO: Allow configuration)
-PSLOT:      .byte 2         ; Hardcoded for Apple IIc (TODO: Allow configuration)
-PEXIT:      .byte 0         ; Set when it's time to exit (Not Yet Implemented)
-
-
-;;; Keyboard state
-LASTKB:     .byte 0
-LASTOA:     .byte 0
-LASTCA:     .byte 0
-
-.ifdef PADDLE_SUPPORT
-
-;;; Paddle state
-LASTP0:     .byte 0
-LASTP1:     .byte 0
-
-.endif ; PADDLE_SUPPORT

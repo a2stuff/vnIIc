@@ -5,75 +5,96 @@ Current file: client.s
 000000r 1               PADDLE_SUPPORT = 1
 000000r 1               ;;; MOUSE_SUPPORT  = 1
 000000r 1               
-000000r 1               ;;;---------------------------------------------------------
-000000r 1               ;;; Super Serial constants/locations
-000000r 1               ;;;---------------------------------------------------------
-000000r 1               
-000000r 1               ;;; These get incremented by the slot where they appear
-000000r 1               UACTRL   = $C08B   ; Control Register
-000000r 1               UACMND   = $C08A   ; Command Register
-000000r 1               UASTAT   = $C089   ; Status Register
-000000r 1               UADATA   = $C088   ; Data Register - incoming and outgoing data
-000000r 1               
+000000r 1               .include "apple2.inc"
+000000r 2               
+000000r 2               ;-----------------------------------------------------------------------------
+000000r 2               ; Zero page stuff
+000000r 2               
+000000r 2               WNDLFT  :=      $20     ; Text window left
+000000r 2               WNDWDTH :=      $21     ; Text window width
+000000r 2               WNDTOP  :=      $22     ; Text window top
+000000r 2               WNDBTM  :=      $23     ; Text window bottom+1
+000000r 2               CH      :=      $24     ; Cursor horizontal position
+000000r 2               CV      :=      $25     ; Cursor vertical position
+000000r 2               BASL    :=      $28     ; Text base address low
+000000r 2               BASH    :=      $29     ; Text base address high
+000000r 2               INVFLG  :=      $32     ; Normal/inverse(/flash)
+000000r 2               PROMPT  :=      $33     ; Used by GETLN
+000000r 2               RNDL    :=      $4E     ; Random counter low
+000000r 2               RNDH    :=      $4F     ; Random counter high
+000000r 2               HIMEM   :=      $73     ; Highest available memory address+1
+000000r 2               
+000000r 2               ;-----------------------------------------------------------------------------
+000000r 2               ; Vectors
+000000r 2               
+000000r 2               DOSWARM :=      $03D0   ; DOS warmstart vector
+000000r 2               BRKVec  :=      $03F0   ; Break vector
+000000r 2               SOFTEV  :=      $03F2   ; Vector for warm start
+000000r 2               PWREDUP :=      $03F4   ; This must be = EOR #$A5 of SOFTEV+1
+000000r 2               
+000000r 2               ;-----------------------------------------------------------------------------
+000000r 2               ; Hardware
+000000r 2               
+000000r 2               ; Keyboard input
+000000r 2               KBD     :=      $C000   ; Read keyboard
+000000r 2               KBDSTRB :=      $C010   ; Clear keyboard strobe
+000000r 2               
+000000r 2               ; 80 column video switches
+000000r 2               CLR80COL:=      $C000   ; Disable 80 column store
+000000r 2               SET80COL:=      $C001   ; Enable 80 column store
+000000r 2               RD80COL :=      $C018   ; >127 if 80 column store enabled
+000000r 2               RD80VID :=      $C01F   ; >127 if 80 column video enabled
+000000r 2               
+000000r 2               ; Character set switches
+000000r 2               CLRALTCHAR :=   $C00E   ; Normal Apple II char set
+000000r 2               SETALTCHAR :=   $C00F   ; Norm/inv LC, no flash
+000000r 2               ALTCHARSET :=   $C01E   ; >127 if alt charset switched in
+000000r 2               
+000000r 2               ; Language card switches
+000000r 2               RDLCBNK2:=      $C011   ; >127 if LC bank 2 in use
+000000r 2               RDLCRAM :=      $C012   ; >127 if LC is read enabled
+000000r 2               ROMIN   :=      $C081   ; Swap in D000-FFFF ROM
+000000r 2               LCBANK2 :=      $C083   ; Swap in LC bank 2
+000000r 2               LCBANK1 :=      $C08B   ; Swap in LC bank 1
+000000r 2               
+000000r 2               ; Video mode switches
+000000r 2               TXTCLR  :=      $C050   ; Display graphics
+000000r 2               TXTSET  :=      $C051   ; Display text
+000000r 2               MIXCLR  :=      $C052   ; Disable 4 lines of text
+000000r 2               MIXSET  :=      $C053   ; Enable 4 lines of text
+000000r 2               LOWSCR  :=      $C054   ; Page 1
+000000r 2               HISCR   :=      $C055   ; Page 2
+000000r 2               LORES   :=      $C056   ; Lores graphics
+000000r 2               HIRES   :=      $C057   ; Hires graphics
+000000r 2               
+000000r 2               ; Game controller
+000000r 2               BUTN0   :=      $C061   ; Open-Apple Key
+000000r 2               BUTN1   :=      $C062   ; Closed-Apple Key
+000000r 2               
 000000r 1               
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               ;;; Hi-res graphics constants/locations
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               
-000000r 1               PLOTPAGE  = $E6 ; Active hires plotting page (Applesoft)
-000000r 1               PLOTPAGE1 = $20
-000000r 1               PLOTPAGE2 = $40
-000000r 1               PAGESIZE  = $20 ; Size of hi-res screen in pages
-000000r 1               
-000000r 1               
-000000r 1               CLRTEXT  = $C050 ;display graphics
-000000r 1               SETTEXT  = $C051 ;display text
-000000r 1               CLRMIXED = $C052 ;clear mixed mode- enable full graphics
-000000r 1               SETMIXED = $C053 ;enable graphics/text mixed mode
-000000r 1               PAGE1    = $C054 ;select text/graphics page1
-000000r 1               PAGE2    = $C055 ;select text/graphics page2
-000000r 1               CLRHIRES = $C056 ;select Lo-res
-000000r 1               SETHIRES = $C057 ;select Hi-res
-000000r 1               
+000000r 1               PLOTPAGE  := $E6 ; Active hires plotting page (Applesoft)
+000000r 1               PLOTPAGE1 := $20
+000000r 1               PLOTPAGE2 := $40
+000000r 1               PAGESIZE  := $20 ; Size of hi-res screen in pages
 000000r 1               
 000000r 1               ;;;---------------------------------------------------------
-000000r 1               ;;; Keyboard input constants/locations
+000000r 1               ;;; ROM routines
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               
-000000r 1               KEYBD     =   $C000 ; key down in bit 7; key code in lower bits
-000000r 1               STROBE    =   $C010 ; write to clear key down state
-000000r 1               OPNAPPLE  =   $C061 ; open apple (command) key data (read)
-000000r 1               CLSAPPLE  =   $C062 ; closed apple (option) key data (read)
-000000r 1               PB2       =   $C063 ; Paddle button 2 (read)
-000000r 1               PB3       =   $C060 ; Paddle button 3 (read)
-000000r 1               
-000000r 1               
-000000r 1               ;;;---------------------------------------------------------
-000000r 1               ;;; Paddle/Joystick constants/locations/routines
-000000r 1               ;;;---------------------------------------------------------
-000000r 1               
-000000r 1               PADDLE0 =  $C064    ; bit 7 = status of pdl-0 timer (read)
-000000r 1               PADDLE1 =  $C065    ; bit 7 = status of pdl-1 timer (read)
-000000r 1               PADDLE2 =  $C066    ; bit 7 = status of pdl-2 timer (read)
-000000r 1               PADDLE3 =  $C067    ; bit 7 = status of pdl-3 timer (read)
-000000r 1               PDLTRIG =  $C070    ; trigger paddles
-000000r 1               
-000000r 1               PREAD   =  $FB1E    ; Monitor paddle reading routine, call
-000000r 1                                   ; with paddle # in X, returns value in Y
-000000r 1               
-000000r 1               
+000000r 1               PREAD   :=      $FB1E   ; Monitor paddle reading routine, call
+000000r 1                                       ; with paddle # in X, returns value in Y
 000000r 1               
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               ;;; Other
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               
-000000r 1               SLOT_CASE =   $c000 ; Firmware for slots are at $cx00
-000000r 1               MAX_SLOT  =   7     ; Maximum slot # on an Apple II
+000000r 1               MAX_SLOT  :=   7     ; Maximum slot # on an Apple II
 000000r 1               
-000000r 1               ZP        =   $FA   ; Write cursor location on zero page
-000000r 1               ESCAPE    =   $80   ; Unused image data byte (all black2)
-000000r 1               ESCAPE2   =   $FF   ; Unused image data byte (all white2)
-000000r 1               
+000000r 1               ZP_PTR    :=   $FA   ; Write cursor location on zero page
 000000r 1               
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               ;;; Generic Macros
@@ -101,14 +122,14 @@ Current file: client.s
 000000r 1               
 000000r 1               
 000000r 1               ;;;-------------------------------------------------------------------
-000000r 1               ;
+000000r 1               ;;;
 000000r 1               ;;; Application-level logic
-000000r 1               ;
+000000r 1               ;;;
 000000r 1               ;;;-------------------------------------------------------------------
 000000r 1               
 000000r 1               
 000000r 1               .org $6000
-006000  1  4C 54 60             jmp AppEntry
+006000  1  4C 60 60             jmp AppEntry
 006003  1               
 006003  1               .include "ssc.inc"
 006003  2               ;;;-------------------------------------------------------------------
@@ -122,529 +143,534 @@ Current file: client.s
 006003  2               .proc SSC
 006003  2               
 006003  2               ;;;---------------------------------------------------------
-006003  2               .proc Init
+006003  2               ;;; Super Serial constants/locations
 006003  2               ;;;---------------------------------------------------------
-006003  2               ;;; Initialize the SSC; slot passed in A
-006003  2               ;;;---------------------------------------------------------
-006003  2  0A               asl                 ; Slot passed in A
-006004  2  0A               asl
-006005  2  0A               asl
-006006  2  0A               asl	    	        ; Now $S0
-006007  2  69 88            adc #$88            ; Low byte of UADATA
-006009  2  AA               tax
-00600A  2  A9 0B            lda #CMND_NRDI      ; Command register: no parity, RTS on, DTR on, no interrupts
-00600C  2  9D 02 C0         sta $C002,X
-00600F  2  AC C9 61         ldy PSPEED	        ; Control register: look up by baud rate (8 data bits, 1 stop bit)
-006012  2  B9 C5 61         lda BPSCTRL,Y
-006015  2  9D 03 C0         sta $C003,X
-006018  2  8E 38 60         stx MOD_UADATA_1+1	; Modify references to
-00601B  2  8E 45 60         stx MOD_UADATA_2+1	; UADATA to point at
-00601E  2  8E 51 60         stx MOD_UADATA_3+1	; correct slot (UADATA+S0)
-006021  2  E8               inx
-006022  2  8E 2E 60         stx MOD_UASTAT_1+1	; Modify reference to
-006025  2  8E 3C 60         stx MOD_UASTAT_2+1	; UASTAT to point at
-006028  2  8E 49 60         stx MOD_UASTAT_3+1  ; correct slot (UASTAT+S0)
-00602B  2  60               rts
-00602C  2               
-00602C  2               .endproc
-00602C  2               
-00602C  2               
-00602C  2               ;;;---------------------------------------------------------
-00602C  2               .proc Put
-00602C  2               ;;;---------------------------------------------------------
-00602C  2               ;;; Send accumulator out the serial port
-00602C  2               ;;;---------------------------------------------------------
-00602C  2  48               pha		    ; Push A onto the stack
-00602D  2               MOD_UASTAT_1:
-00602D  2  AD 89 C0     :   lda UASTAT	; Check status bits
-006030  2  29 70            and #$70
-006032  2  C9 10            cmp #$10
-006034  2  D0 F7            bne :-  	; Output register is full, so loop
-006036  2  68               pla
-006037  2               MOD_UADATA_1:
-006037  2  8D 88 C0         sta UADATA	; Put character
-00603A  2  60               rts
-00603B  2               .endproc
-00603B  2                       MOD_UASTAT_1 := Put::MOD_UASTAT_1
-00603B  2                       MOD_UADATA_1 := Put::MOD_UADATA_1
-00603B  2               
-00603B  2               ;;;---------------------------------------------------------
-00603B  2               .proc Get
-00603B  2               ;;;---------------------------------------------------------
-00603B  2               ;;; Read a character from the serial port to the accumulator
-00603B  2               ;;;---------------------------------------------------------
-00603B  2               MOD_UASTAT_2:
-00603B  2  AD 89 C0     	lda UASTAT	; Check status bits
-00603E  2  29 68            and #$68
-006040  2  C9 08            cmp #$8
-006042  2  D0 F7            bne Get	; Input register empty, loop
-006044  2               MOD_UADATA_2:
-006044  2  AD 88 C0     	lda UADATA	; Get character
-006047  2  60               rts
-006048  2               .endproc
-006048  2                       MOD_UASTAT_2 := Get::MOD_UASTAT_2
-006048  2                       MOD_UADATA_2 := Get::MOD_UADATA_2
-006048  2               
-006048  2               ;;;---------------------------------------------------------
-006048  2               .proc HasData
-006048  2               ;;;---------------------------------------------------------
-006048  2               ;;; Read a character from the serial port to the accumulator
-006048  2               ;;;---------------------------------------------------------
-006048  2               MOD_UASTAT_3:
-006048  2  AD 89 C0     	lda UASTAT	; Check status bits
-00604B  2  29 68            and #$68
-00604D  2  C9 08            cmp #$8
-00604F  2  60               rts
-006050  2               .endproc
-006050  2                       MOD_UASTAT_3 := HasData::MOD_UASTAT_3
-006050  2               
-006050  2               
-006050  2               ;;;---------------------------------------------------------
-006050  2               .proc Reset
-006050  2               ;;;---------------------------------------------------------
-006050  2               ;;; Clean up serial port
-006050  2               ;;;---------------------------------------------------------
-006050  2               MOD_UADATA_3:
-006050  2  2C 88 C0     	bit UADATA
+006003  2               
+006003  2               ;;; These get incremented by the slot where they appear
+006003  2               UACTRL   = $C08B   ; Control Register
+006003  2               UACMND   = $C08A   ; Command Register
+006003  2               UASTAT   = $C089   ; Status Register
+006003  2               UADATA   = $C088   ; Data Register - incoming and outgoing data
+006003  2               
+006003  2               ;;; Lookup table for UACTRL register, by baud rate
+006003  2               
+006003  2  16 1E 1F 10  BPSCTRL:	.byte $16,$1E,$1F,$10	; 300, 9600, 19200, 115k (with 8 data bits, 1 stop bit, no echo)
+006007  2               .enum
+006007  2                   BPS_300
+006007  2                   BPS_9600
+006007  2                   BPS_19200
+006007  2                   BPS_115k
+006007  2               .endenum
+006007  2               
+006007  2               CMND_NRDI    = $0B    ; Command: no parity, RTS on, DTR on, no interrupts
+006007  2               
+006007  2               
+006007  2               ;;;---------------------------------------------------------
+006007  2               .proc Init
+006007  2               ;;;---------------------------------------------------------
+006007  2               ;;; Initialize the SSC; slot passed in A
+006007  2               ;;;---------------------------------------------------------
+006007  2  0A               asl                 ; Slot passed in A
+006008  2  0A               asl
+006009  2  0A               asl
+00600A  2  0A               asl	    	        ; Now $S0
+00600B  2  69 88            adc #$88            ; Low byte of UADATA
+00600D  2  AA               tax
+00600E  2  A9 0B            lda #CMND_NRDI      ; Command register: no parity, RTS on, DTR on, no interrupts
+006010  2  9D 02 C0         sta $C002,X
+006013  2  AC 58 60         ldy PSPEED	        ; Control register: look up by baud rate (8 data bits, 1 stop bit)
+006016  2  B9 03 60         lda BPSCTRL,Y
+006019  2  9D 03 C0         sta $C003,X
+00601C  2  8E 3C 60         stx MOD_UADATA_1	; Modify references to
+00601F  2  8E 49 60         stx MOD_UADATA_2	; UADATA to point at
+006022  2  8E 55 60         stx MOD_UADATA_3	; correct slot (UADATA+S0)
+006025  2  E8               inx
+006026  2  8E 32 60         stx MOD_UASTAT_1	; Modify reference to
+006029  2  8E 40 60         stx MOD_UASTAT_2	; UASTAT to point at
+00602C  2  8E 4D 60         stx MOD_UASTAT_3    ; correct slot (UASTAT+S0)
+00602F  2  60               rts
+006030  2               .endproc
+006030  2               
+006030  2               
+006030  2               ;;;---------------------------------------------------------
+006030  2               .proc Put
+006030  2               ;;;---------------------------------------------------------
+006030  2               ;;; Send accumulator out the serial port
+006030  2               ;;;---------------------------------------------------------
+006030  2  48               pha		    ; Push A onto the stack
+006031  2               MOD_UASTAT_1 := *+1
+006031  2  AD 89 C0     :   lda UASTAT	; Check status bits
+006034  2  29 70            and #$70
+006036  2  C9 10            cmp #$10
+006038  2  D0 F7            bne :-  	; Output register is full, so loop
+00603A  2  68               pla
+00603B  2               MOD_UADATA_1 := *+1
+00603B  2  8D 88 C0         sta UADATA	; Put character
+00603E  2  60               rts
+00603F  2               .endproc
+00603F  2                       MOD_UASTAT_1 := Put::MOD_UASTAT_1
+00603F  2                       MOD_UADATA_1 := Put::MOD_UADATA_1
+00603F  2               
+00603F  2               ;;;---------------------------------------------------------
+00603F  2               .proc Get
+00603F  2               ;;;---------------------------------------------------------
+00603F  2               ;;; Read a character from the serial port to the accumulator
+00603F  2               ;;;---------------------------------------------------------
+00603F  2               MOD_UASTAT_2 := *+1
+00603F  2  AD 89 C0     	lda UASTAT	; Check status bits
+006042  2  29 68            and #$68
+006044  2  C9 08            cmp #$8
+006046  2  D0 F7            bne Get	; Input register empty, loop
+006048  2               MOD_UADATA_2 := *+1
+006048  2  AD 88 C0     	lda UADATA	; Get character
+00604B  2  60               rts
+00604C  2               .endproc
+00604C  2                       MOD_UASTAT_2 := Get::MOD_UASTAT_2
+00604C  2                       MOD_UADATA_2 := Get::MOD_UADATA_2
+00604C  2               
+00604C  2               ;;;---------------------------------------------------------
+00604C  2               .proc HasData
+00604C  2               ;;;---------------------------------------------------------
+00604C  2               ;;; Read a character from the serial port to the accumulator
+00604C  2               ;;;---------------------------------------------------------
+00604C  2               MOD_UASTAT_3 := *+1
+00604C  2  AD 89 C0     	lda UASTAT	; Check status bits
+00604F  2  29 68            and #$68
+006051  2  C9 08            cmp #$8
 006053  2  60               rts
 006054  2               .endproc
-006054  2                       MOD_UADATA_3 := Reset::MOD_UADATA_3
+006054  2                       MOD_UASTAT_3 := HasData::MOD_UASTAT_3
 006054  2               
-006054  2               .endproc
 006054  2               
-006054  1               
-006054  1               .ifdef MOUSE_SUPPORT
-006054  1                       .include "mouse.inc"
-006054  1               .endif ; MOUSE_SUPPORT
-006054  1               
-006054  1               
-006054  1               ;;;---------------------------------------------------------
-006054  1               .proc AppEntry
-006054  1               ;;;---------------------------------------------------------
-006054  1               ;;; Initialize the application, and enter the main loop
-006054  1               ;;;---------------------------------------------------------
-006054  1  AD CA 61         lda PSLOT          ; Use slot 2
-006057  1  20 03 60         jsr SSC::Init      ; Initialize Super Serial Card
-00605A  1  20 80 61         jsr InitHires      ; Initialize Hi-Res graphics
-00605D  1  20 94 60         jsr InitInput      ; Initialize input devices
-006060  1  20 6D 60         jsr MainLoop
-006063  1               
-006063  1                   ; fall through
-006063  1               .endproc
-006063  1               
-006063  1               ;;;---------------------------------------------------------
-006063  1               .proc AppExit
-006063  1               ;;;---------------------------------------------------------
-006063  1               ;;; Clean up and exit app
-006063  1               ;;;---------------------------------------------------------
-006063  1  20 50 60         jsr SSC::Reset
-006066  1  8D 54 C0         sta PAGE1
-006069  1  8D 51 C0         sta SETTEXT
-00606C  1  60               rts
-00606D  1               .endproc
-00606D  1               
-00606D  1               
-00606D  1               ;;;-------------------------------------------------------------------
-00606D  1               ;
-00606D  1               ;;; Main loop functionality
-00606D  1               ;
-00606D  1               ;;;-------------------------------------------------------------------
-00606D  1               
-00606D  1               
-00606D  1               ;;;---------------------------------------------------------
-00606D  1               .proc MainLoop
-00606D  1               ;;;---------------------------------------------------------
-00606D  1               
-00606D  1               ;;; TODO: Sort out the protocol - should be able to send
-00606D  1               ;;; input state without receiving data
-00606D  1               ;;;    jsr SSCHasData      ; Anything to read?
-00606D  1               ;;;    bne :+              ; Nope
-00606D  1               
-00606D  1  20 77 60     :   jsr ReceivePage
-006070  1  20 97 61         jsr FlipHires
-006073  1  4C 6D 60         jmp :-              ; TODO: define an exit trigger
-006076  1  60               rts
-006077  1               .endproc
-006077  1               
-006077  1               
-006077  1               ;;;---------------------------------------------------------
-006077  1               .proc ReceivePage
-006077  1               ;;;---------------------------------------------------------
-006077  1               ;;; Pull a hi-res page down over serial
-006077  1               ;
-006077  1               ;;; Protocol is:
-006077  1               ;;;  * Recieve 256 bytes (graphic data)
-006077  1               ;;;  * Send 1 byte (input state)
-006077  1               ;;;---------------------------------------------------------
-006077  1               
-006077  1  A9 00            lda #0        ; set up write pointer
-006079  1  85 FA            sta ZP
-00607B  1  A5 E6            lda PLOTPAGE
-00607D  1  85 FB            sta ZP+1
-00607F  1  A2 20            ldx #PAGESIZE ; plan to receive this many pages
-006081  1  A0 00            ldy #0
+006054  2               ;;;---------------------------------------------------------
+006054  2               .proc Reset
+006054  2               ;;;---------------------------------------------------------
+006054  2               ;;; Clean up serial port
+006054  2               ;;;---------------------------------------------------------
+006054  2               MOD_UADATA_3 := *+1
+006054  2  2C 88 C0     	bit UADATA
+006057  2  60               rts
+006058  2               .endproc
+006058  2                       MOD_UADATA_3 := Reset::MOD_UADATA_3
+006058  2               
+006058  2               .endproc
+006058  2               
+006058  1               
+006058  1               .ifdef MOUSE_SUPPORT
+006058  1                       .include "mouse.inc"
+006058  1               .endif ; MOUSE_SUPPORT
+006058  1               
+006058  1               
+006058  1               ;;;-------------------------------------------------------------------
+006058  1               ;;; Variables
+006058  1               ;;;-------------------------------------------------------------------
+006058  1               
+006058  1               ;;; Application configuration
+006058  1  03           PSPEED:     .byte SSC::BPS_115k  ; Hardcoded for Apple IIc (TODO: Allow configuration)
+006059  1  02           PSLOT:      .byte 2         ; Hardcoded for Apple IIc (TODO: Allow configuration)
+00605A  1  00           PEXIT:      .byte 0         ; Set when it's time to exit (Not Yet Implemented)
+00605B  1               
+00605B  1               ;;; Keyboard state
+00605B  1  00           LASTKB:     .byte 0
+00605C  1  00           LASTOA:     .byte 0
+00605D  1  00           LASTCA:     .byte 0
+00605E  1               
+00605E  1               .ifdef PADDLE_SUPPORT
+00605E  1               
+00605E  1               ;;; Paddle state
+00605E  1  00           LASTP0:     .byte 0
+00605F  1  00           LASTP1:     .byte 0
+006060  1               
+006060  1               .endif ; PADDLE_SUPPORT
+006060  1               
+006060  1               
+006060  1               ;;;---------------------------------------------------------
+006060  1               .proc AppEntry
+006060  1               ;;;---------------------------------------------------------
+006060  1               ;;; Initialize the application, and enter the main loop
+006060  1               ;;;---------------------------------------------------------
+006060  1  AD 59 60         lda PSLOT          ; Use slot 2
+006063  1  20 07 60         jsr SSC::Init      ; Initialize Super Serial Card
+006066  1  20 8C 61         jsr InitHires      ; Initialize Hi-Res graphics
+006069  1  20 A0 60         jsr InitInput      ; Initialize input devices
+00606C  1  20 79 60         jsr MainLoop
+00606F  1               
+00606F  1                   ; fall through
+00606F  1               .endproc
+00606F  1               
+00606F  1               ;;;---------------------------------------------------------
+00606F  1               .proc AppExit
+00606F  1               ;;;---------------------------------------------------------
+00606F  1               ;;; Clean up and exit app
+00606F  1               ;;;---------------------------------------------------------
+00606F  1  20 54 60         jsr SSC::Reset
+006072  1  8D 54 C0         sta LOWSCR
+006075  1  8D 51 C0         sta TXTSET
+006078  1  60               rts
+006079  1               .endproc
+006079  1               
+006079  1               
+006079  1               ;;;-------------------------------------------------------------------
+006079  1               ;;;
+006079  1               ;;; Main loop functionality
+006079  1               ;;;
+006079  1               ;;;-------------------------------------------------------------------
+006079  1               
+006079  1               
+006079  1               ;;;---------------------------------------------------------
+006079  1               .proc MainLoop
+006079  1               ;;;---------------------------------------------------------
+006079  1               
+006079  1               ;;; TODO: Sort out the protocol - should be able to send
+006079  1               ;;; input state without receiving data
+006079  1               ;;;    jsr SSCHasData      ; Anything to read?
+006079  1               ;;;    bne :+              ; Nope
+006079  1               
+006079  1  20 83 60     :   jsr ReceivePage
+00607C  1  20 A3 61         jsr FlipHires
+00607F  1  4C 79 60         jmp :-              ; TODO: define an exit trigger
+006082  1  60               rts
+006083  1               .endproc
 006083  1               
-006083  1  20 3B 60     :   jsr SSC::Get  ; TODO: look for escape codes in the sequence
-006086  1  91 FA            sta (ZP),Y
-006088  1  C8               iny
-006089  1  D0 F8            bne :-       ; Do a full page...
-00608B  1               
-00608B  1  20 B2 60         jsr SendInputState ; brief moment to send data back upstream
-00608E  1               
-00608E  1  E6 FB            inc ZP+1
-006090  1  CA               dex
-006091  1  D0 F0            bne :-       ; ...as many pages as we need
-006093  1  60               rts
-006094  1               .endproc
-006094  1               
-006094  1               
-006094  1               ;;;-------------------------------------------------------------------
-006094  1               ;
-006094  1               ;;; Input device routines
-006094  1               ;
-006094  1               ;;;-------------------------------------------------------------------
-006094  1               ;;; Protocol:
-006094  1               ;;;  $7f - $ff - key down, ASCII code + $80
-006094  1               ;;;  otherwise, a transition:
-006094  1               ;
-006094  1                   SIS_KBUP    = $00   ; Key up
-006094  1                   SIS_OADOWN  = $01   ; Open Apple transitioned to down
-006094  1                   SIS_OAUP    = $02   ; Open Apple transitioned to up
-006094  1                   SIS_CADOWN  = $03   ; Closed Apple transitioned to down
-006094  1                   SIS_CAUP    = $04   ; Closed Apple transitioned to up
-006094  1               ;
-006094  1               ;;;  $05 - $0f : reserved
-006094  1               ;
-006094  1                   SIS_MX      = $10   ; Mouse X high nibble
-006094  1                   SIS_MY      = $20   ; Mouse Y high nibble
-006094  1                   SIS_PDL0    = $30   ; Paddle 0 high nibble
-006094  1                   SIS_PDL1    = $40   ; Paddle 1 high nibble
-006094  1               ;
-006094  1               ;;;  $50 - $7e : reserved
-006094  1               ;
-006094  1                   SIS_SYNC    = $7f
-006094  1               
-006094  1               ;;;---------------------------------------------------------
-006094  1               .proc InitInput
-006094  1               ;;;---------------------------------------------------------
-006094  1               ;;; Initialize input devices and storage for detecting
-006094  1               ;;; state transitions
-006094  1               ;;;---------------------------------------------------------
-006094  1               
-006094  1               ;;; Init keyboard state
-006094  1  A9 00            lda #SIS_KBUP
-006096  1  8D CC 61         sta LASTKB
-006099  1               
-006099  1               ;;; Init Open/Closed Apple states
-006099  1  A9 02            lda #SIS_OAUP       ; NOTE: Don't store OA state as it fluctuates
-00609B  1  8D CD 61         sta LASTOA
-00609E  1  A9 04            lda #SIS_CAUP       ; NOTE: Don't store CA state as it fluctuates
-0060A0  1  8D CE 61         sta LASTCA
-0060A3  1               
-0060A3  1               .ifdef PADDLE_SUPPORT
-0060A3  1               ;;; Init Paddle state
-0060A3  1  A9 30            lda #SIS_PDL0
-0060A5  1  09 08            ora #8              ; Middle of range 0...15
-0060A7  1  8D CF 61         sta LASTP0
-0060AA  1  A9 40            lda #SIS_PDL1
-0060AC  1  09 08            ora #8              ; Middle of range 0...15
-0060AE  1  8D D0 61         sta LASTP1
-0060B1  1               .endif
-0060B1  1               
-0060B1  1               .ifdef MOUSE_SUPPORT
-0060B1  1                   jsr Mouse::FindMouse
-0060B1  1               .endif
-0060B1  1               
-0060B1  1  60               rts
-0060B2  1               .endproc
-0060B2  1               
-0060B2  1               
-0060B2  1               ;;;---------------------------------------------------------
-0060B2  1               .proc SendInputState
-0060B2  1               ;;;---------------------------------------------------------
-0060B2  1               ;;; Send keyboard joystick and/or mouse state over the
-0060B2  1               ;;; serial port
-0060B2  1               ;
-0060B2  1               ;;; Algorithm:
-0060B2  1               ;;; - Send key state (if it changed)
-0060B2  1               ;;; - otherwise send open-apple state (if it changed)
-0060B2  1               ;;; - otherwise send closed-apple state (if it changed)
-0060B2  1               ;;; - otherwise send paddle 0 state (if it changed)
-0060B2  1               ;;; - (TODO: Mouse state)
-0060B2  1               ;;; - otherwise send sync byte
-0060B2  1               ;;;---------------------------------------------------------
-0060B2  1               
-0060B2  1  48 8A 48 98      SaveRegisters       ; Store registers
-0060B6  1  48           
-0060B7  1  18               clc
-0060B8  1               
-0060B8  1               ;;;--------------------------------------
-0060B8  1               ;;; Send key state, if it changed
-0060B8  1               
-0060B8  1               ;;; NOTE: Can't use STROBE to detect key up -> key down transition
-0060B8  1               ;;; since the msb can change before the key code. Instead, consider
-0060B8  1               ;;; these cases:
-0060B8  1               ;
-0060B8  1               ;;;  OLD STATE    KEYBD     STROBE     RESULT
-0060B8  1               ;;;   Up           Up        -          No-op
-0060B8  1               ;;;   Up           Down      -          Save and send key down
-0060B8  1               ;;;   Down         -         Up         Save and send key up
-0060B8  1               ;;;   Down         -         Down       Save and send key ONLY if different
-0060B8  1               ;
-0060B8  1               
-0060B8  1  AD CC 61         lda LASTKB
-0060BB  1  D0 0E            bne KEY_WAS_DOWN
+006083  1               
+006083  1               ;;;---------------------------------------------------------
+006083  1               .proc ReceivePage
+006083  1               ;;;---------------------------------------------------------
+006083  1               ;;; Pull a hi-res page down over serial
+006083  1               ;;;
+006083  1               ;;; Protocol is:
+006083  1               ;;;  * Recieve 256 bytes (graphic data)
+006083  1               ;;;  * Send 1 byte (input state)
+006083  1               ;;;---------------------------------------------------------
+006083  1               
+006083  1  A9 00            lda #0        ; set up write pointer
+006085  1  85 FA            sta ZP_PTR
+006087  1  A5 E6            lda PLOTPAGE
+006089  1  85 FB            sta ZP_PTR+1
+00608B  1  A2 20            ldx #PAGESIZE ; plan to receive this many pages
+00608D  1  A0 00            ldy #0
+00608F  1               
+00608F  1  20 3F 60     :   jsr SSC::Get  ; TODO: look for escape codes in the sequence
+006092  1  91 FA            sta (ZP_PTR),Y
+006094  1  C8               iny
+006095  1  D0 F8            bne :-       ; Do a full page...
+006097  1               
+006097  1  20 BE 60         jsr SendInputState ; brief moment to send data back upstream
+00609A  1               
+00609A  1  E6 FB            inc ZP_PTR+1
+00609C  1  CA               dex
+00609D  1  D0 F0            bne :-       ; ...as many pages as we need
+00609F  1  60               rts
+0060A0  1               .endproc
+0060A0  1               
+0060A0  1               
+0060A0  1               ;;;-------------------------------------------------------------------
+0060A0  1               ;;;
+0060A0  1               ;;; Input device routines
+0060A0  1               ;;;
+0060A0  1               ;;;-------------------------------------------------------------------
+0060A0  1               ;;; Protocol:
+0060A0  1               ;;;  $7f - $ff - key down, ASCII code + $80
+0060A0  1               ;;;  otherwise, a transition:
+0060A0  1               ;;;
+0060A0  1                   SIS_KBUP    = $00   ; Key up
+0060A0  1                   SIS_OADOWN  = $01   ; Open Apple transitioned to down
+0060A0  1                   SIS_OAUP    = $02   ; Open Apple transitioned to up
+0060A0  1                   SIS_CADOWN  = $03   ; Closed Apple transitioned to down
+0060A0  1                   SIS_CAUP    = $04   ; Closed Apple transitioned to up
+0060A0  1               ;;;
+0060A0  1               ;;;  $05 - $0f : reserved
+0060A0  1               ;;;
+0060A0  1                   SIS_MX      = $10   ; Mouse X high nibble
+0060A0  1                   SIS_MY      = $20   ; Mouse Y high nibble
+0060A0  1                   SIS_PDL0    = $30   ; Paddle 0 high nibble
+0060A0  1                   SIS_PDL1    = $40   ; Paddle 1 high nibble
+0060A0  1               ;;;
+0060A0  1               ;;;  $50 - $7e : reserved
+0060A0  1               ;;;
+0060A0  1                   SIS_SYNC    = $7f
+0060A0  1               
+0060A0  1               ;;;---------------------------------------------------------
+0060A0  1               .proc InitInput
+0060A0  1               ;;;---------------------------------------------------------
+0060A0  1               ;;; Initialize input devices and storage for detecting
+0060A0  1               ;;; state transitions
+0060A0  1               ;;;---------------------------------------------------------
+0060A0  1               
+0060A0  1               ;;; Init keyboard state
+0060A0  1  A9 00            lda #SIS_KBUP
+0060A2  1  8D 5B 60         sta LASTKB
+0060A5  1               
+0060A5  1               ;;; Init Open/Closed Apple states
+0060A5  1  A9 02            lda #SIS_OAUP       ; NOTE: Don't store OA state as it fluctuates
+0060A7  1  8D 5C 60         sta LASTOA
+0060AA  1  A9 04            lda #SIS_CAUP       ; NOTE: Don't store CA state as it fluctuates
+0060AC  1  8D 5D 60         sta LASTCA
+0060AF  1               
+0060AF  1               .ifdef PADDLE_SUPPORT
+0060AF  1               ;;; Init Paddle state
+0060AF  1  A9 30            lda #SIS_PDL0
+0060B1  1  09 08            ora #8              ; Middle of range 0...15
+0060B3  1  8D 5E 60         sta LASTP0
+0060B6  1  A9 40            lda #SIS_PDL1
+0060B8  1  09 08            ora #8              ; Middle of range 0...15
+0060BA  1  8D 5F 60         sta LASTP1
+0060BD  1               .endif
 0060BD  1               
-0060BD  1               KEY_WAS_UP:
-0060BD  1  AD 00 C0         lda KEYBD           ; Read keyboard
-0060C0  1  10 27            bpl END_KEY         ; - still up
-0060C2  1  8D CC 61         sta LASTKB          ; Down, so save it
-0060C5  1  20 2C 60         jsr SSC::Put          ; and send it
-0060C8  1  4C 7A 61         jmp DONE
-0060CB  1               
-0060CB  1               KEY_WAS_DOWN:
-0060CB  1                   ; key was down - strobe should match
-0060CB  1                   ; unless the key changed or was released
-0060CB  1  AD 10 C0         lda STROBE
-0060CE  1  30 0B            bmi STROBE_DOWN
-0060D0  1               STROBE_UP:
-0060D0  1  A9 00            lda #SIS_KBUP       ; Key was released
-0060D2  1  8D CC 61         sta LASTKB          ; so save it
-0060D5  1  20 2C 60         jsr SSC::Put          ; and send it
-0060D8  1  4C 7A 61         jmp DONE
-0060DB  1               STROBE_DOWN:
-0060DB  1  CD CC 61         cmp LASTKB          ; Same key as last time?
-0060DE  1  F0 09            beq END_KEY         ; - no change
-0060E0  1  8D CC 61         sta LASTKB          ; New key, so save it
-0060E3  1  20 2C 60         jsr SSC::Put          ; and send it
-0060E6  1  4C 7A 61         jmp DONE
-0060E9  1               
-0060E9  1               END_KEY:
-0060E9  1               
-0060E9  1               ;;;--------------------------------------
-0060E9  1               ;;; Send Open Apple state, if it changed
-0060E9  1               
-0060E9  1               ;;; TODO: Can simplify this code if we make the high bits the same
-0060E9  1               ;;; for both OA states and bit = 0 down: lda OPNAPPLE ; ROL ; LDA #0 ; ROL ; ORA #signature
-0060E9  1               
-0060E9  1               TEST_OA:
-0060E9  1  AD 61 C0         lda OPNAPPLE        ; Test Open Apple state
-0060EC  1  30 10            bmi OA_IS_DOWN
-0060EE  1               OA_IS_UP:
-0060EE  1  A9 02            lda #SIS_OAUP
-0060F0  1  CD CD 61         cmp LASTOA          ; Changed?
-0060F3  1  F0 19            beq END_OA          ; Nope
-0060F5  1  8D CD 61         sta LASTOA          ; Yes, save it / send it!
-0060F8  1  20 2C 60         jsr SSC::Put
-0060FB  1  4C 7A 61         jmp DONE
-0060FE  1               OA_IS_DOWN:
-0060FE  1  A9 01            lda #SIS_OADOWN
-006100  1  CD CD 61         cmp LASTOA          ; Changed?
-006103  1  F0 09            beq END_OA          ; Nope
-006105  1  8D CD 61         sta LASTOA          ; Yes, save it / send it!
-006108  1  20 2C 60         jsr SSC::Put
-00610B  1  4C 7A 61         jmp DONE
-00610E  1               
-00610E  1               END_OA:
-00610E  1               
-00610E  1               ;;;--------------------------------------
-00610E  1               ;;; Send Closed Apple state, if it changed
-00610E  1               
-00610E  1               TEST_CA:
-00610E  1  AD 62 C0         lda CLSAPPLE        ; Has the Open Apple/Button 1 value changed?
-006111  1  30 10            bmi CA_IS_DOWN
-006113  1               CA_IS_UP:
-006113  1  A9 04            lda #SIS_CAUP
-006115  1  CD CE 61         cmp LASTCA          ; Changed?
-006118  1  F0 19            beq END_CA          ; Nope
-00611A  1  8D CE 61         sta LASTCA          ; Yes, save it
-00611D  1  20 2C 60         jsr SSC::Put          ; and send it
-006120  1  4C 7A 61         jmp DONE
-006123  1               CA_IS_DOWN:
-006123  1  A9 03            lda #SIS_CADOWN
-006125  1  CD CE 61         cmp LASTCA          ; Changed?
-006128  1  F0 09            beq END_CA          ; Nope
-00612A  1  8D CE 61         sta LASTCA          ; Yes, save it
-00612D  1  20 2C 60         jsr SSC::Put          ; and send it
-006130  1  4C 7A 61         jmp DONE
-006133  1               
-006133  1               END_CA:
-006133  1               
-006133  1               .ifdef PADDLE_SUPPORT
-006133  1               
-006133  1               ;;;--------------------------------------
-006133  1               ;;; Send Paddle 0 state, if it changed
-006133  1               TEST_PDL0:
-006133  1  A2 00            ldx #0
-006135  1  20 1E FB         jsr PREAD
-006138  1  98               tya
-006139  1  4A               lsr                 ; Shift to low nibble
-00613A  1  4A               lsr
-00613B  1  4A               lsr
-00613C  1  4A               lsr
-00613D  1  09 30            ora #SIS_PDL0       ; And mark it with the signature
-00613F  1  CD CF 61         cmp LASTP0          ; Change?
-006142  1  F0 09            beq END_PDL0        ; Nope
-006144  1  8D CF 61         sta LASTP0          ; Yes, save it
-006147  1  20 2C 60         jsr SSC::Put          ; and send it
-00614A  1  4C 7A 61         jmp DONE
-00614D  1               END_PDL0:
-00614D  1                   ; Chew up time so next paddle read will be correct
-00614D  1                   ; TODO: Replace this with a "read both" strobes
-00614D  1                   ; routine
-00614D  1  EA EA EA EA  :   .repeat 11          ; By experiment, need 11 NOPs.
-006151  1  EA EA EA EA  
-006155  1  EA EA EA     
-006158  1                   nop
-006158  1                   .endrep
-006158  1  C8               iny
-006159  1  D0 F2            bne :-
-00615B  1               
-00615B  1               ;;;--------------------------------------
-00615B  1               ;;; Send Paddle 1 state, if it changed
-00615B  1               TEST_PDL1:
-00615B  1  A2 01            ldx #1
-00615D  1  20 1E FB         jsr PREAD
-006160  1  98               tya
-006161  1  4A               lsr                 ; Shift to low nibble
-006162  1  4A               lsr
-006163  1  4A               lsr
-006164  1  4A               lsr
-006165  1  09 40            ora #SIS_PDL1       ; And mark it with the signature
-006167  1  CD D0 61         cmp LASTP1          ; Change?
-00616A  1  F0 09            beq END_PDL1        ; Nope
-00616C  1  8D D0 61         sta LASTP1          ; Yes, save it
-00616F  1  20 2C 60         jsr SSC::Put          ; and send it
-006172  1  4C 7A 61         jmp DONE
-006175  1               END_PDL1:
-006175  1                   ; NOTE: No need to chew time like PDL0
-006175  1                   ; since data receive will make up for it; if we
-006175  1                   ; loop in SendInputState need to add it here
-006175  1               
-006175  1               .endif
-006175  1               
-006175  1               
-006175  1               ;;;--------------------------------------
-006175  1               ;;; No state changes so send sync byte
-006175  1               
-006175  1  A9 7F            lda #SIS_SYNC
-006177  1  20 2C 60         jsr SSC::Put
-00617A  1               
-00617A  1               DONE:
-00617A  1  68 A8 68 AA      RestoreRegisters
-00617E  1  68           
-00617F  1  60               rts
-006180  1               
-006180  1               .endproc
-006180  1               
-006180  1               
-006180  1               ;;;-------------------------------------------------------------------
-006180  1               ;
-006180  1               ;;; Hi-res graphics routines
-006180  1               ;
-006180  1               ;;;-------------------------------------------------------------------
-006180  1               
-006180  1               ;;;---------------------------------------------------------
-006180  1               .proc InitHires
-006180  1               ;;;---------------------------------------------------------
-006180  1               ;;; Set up the graphics display and pointers
-006180  1               ;;;---------------------------------------------------------
-006180  1  A9 20            lda #PLOTPAGE1   ; clear page 1
-006182  1  85 E6            sta PLOTPAGE
-006184  1  20 AD 61         jsr ClearHires
-006187  1               
-006187  1  20 97 61         jsr FlipHires    ; then show it and flip to 2
-00618A  1  8D 57 C0         sta SETHIRES
-00618D  1  8D 50 C0         sta CLRTEXT
-006190  1  8D 52 C0         sta CLRMIXED
-006193  1  8D 54 C0         sta PAGE1
-006196  1               
-006196  1  60               rts
-006197  1               .endproc
-006197  1               
-006197  1               
-006197  1               ;;;---------------------------------------------------------
-006197  1               .proc FlipHires
-006197  1               ;;;---------------------------------------------------------
-006197  1               ;;; Call when done with the current plotting page
-006197  1               ;;; (selected in PLOTPAGE) and it will be shown and the
-006197  1               ;;; other page will be shown.
-006197  1               ;;;---------------------------------------------------------
-006197  1  A5 E6            lda PLOTPAGE        ; plotting on which page?
-006199  1  C9 20            cmp #PLOTPAGE1
-00619B  1  F0 08            beq :+
-00619D  1               
-00619D  1  8D 55 C0         sta PAGE2           ; page 2 - so show it
-0061A0  1  A9 20            lda #PLOTPAGE1      ; and plot on page 1
-0061A2  1  85 E6            sta PLOTPAGE
-0061A4  1  60               rts
-0061A5  1               
-0061A5  1  8D 54 C0     :   sta PAGE1           ; page 1 - so show it
-0061A8  1  A9 40            lda #PLOTPAGE2      ; and plot on page 2
-0061AA  1  85 E6            sta PLOTPAGE
-0061AC  1  60               rts
-0061AD  1               .endproc
-0061AD  1               
-0061AD  1               
-0061AD  1               ;;;---------------------------------------------------------
-0061AD  1               .proc ClearHires
-0061AD  1               ;;;---------------------------------------------------------
-0061AD  1               ;;; Clear hires plotting page (selected in PLOTPAGE) to
-0061AD  1               ;;; black uses ZP; not terribly efficient
-0061AD  1               ;;;---------------------------------------------------------
-0061AD  1  A9 00           lda #0           ; Set up ZP as a pointer into the hires page
-0061AF  1  85 FA           sta ZP
-0061B1  1  A5 E6           lda PLOTPAGE
-0061B3  1  85 FB           sta ZP+1
-0061B5  1  A2 20           ldx #PAGESIZE    ; Clear this many pages
-0061B7  1  A9 00           lda #0           ; with black!
-0061B9  1  A8              tay
-0061BA  1  91 FA        :  sta (ZP),Y
-0061BC  1  C8              iny
-0061BD  1  D0 FB           bne :-
-0061BF  1  E6 FB           inc ZP+1
-0061C1  1  CA              dex
-0061C2  1  D0 F6           bne :-
-0061C4  1  60              rts
-0061C5  1               .endproc
-0061C5  1               
-0061C5  1               
-0061C5  1               
-0061C5  1               
-0061C5  1               ;;;-------------------------------------------------------------------
-0061C5  1               ;
-0061C5  1               ;;; Lookup Tables and Variable Storage
-0061C5  1               ;
-0061C5  1               ;;;-------------------------------------------------------------------
-0061C5  1               
-0061C5  1               ;;; Lookup table for UACTRL register, by baud rate
-0061C5  1               
-0061C5  1  16 1E 1F 10  BPSCTRL:	.byte $16,$1E,$1F,$10	; 300, 9600, 19200, 115k (with 8 data bits, 1 stop bit, no echo)
-0061C9  1               .enum
-0061C9  1                   BPS_300
-0061C9  1                   BPS_9600
-0061C9  1                   BPS_19200
-0061C9  1                   BPS_115k
-0061C9  1               .endenum
-0061C9  1               CMND_NRDI    = $0B    ; Command: no parity, RTS on, DTR on, no interrupts
-0061C9  1               
-0061C9  1               
-0061C9  1               ;;; Application configuration
-0061C9  1  03           PSPEED:     .byte BPS_115k  ; Hardcoded for Apple IIc (TODO: Allow configuration)
-0061CA  1  02           PSLOT:      .byte 2         ; Hardcoded for Apple IIc (TODO: Allow configuration)
-0061CB  1  00           PEXIT:      .byte 0         ; Set when it's time to exit (Not Yet Implemented)
-0061CC  1               
-0061CC  1               
-0061CC  1               ;;; Keyboard state
-0061CC  1  00           LASTKB:     .byte 0
-0061CD  1  00           LASTOA:     .byte 0
-0061CE  1  00           LASTCA:     .byte 0
-0061CF  1               
-0061CF  1               .ifdef PADDLE_SUPPORT
-0061CF  1               
-0061CF  1               ;;; Paddle state
-0061CF  1  00           LASTP0:     .byte 0
-0061D0  1  00           LASTP1:     .byte 0
-0061D1  1               
-0061D1  1               .endif ; PADDLE_SUPPORT
+0060BD  1               .ifdef MOUSE_SUPPORT
+0060BD  1                   jsr Mouse::FindMouse
+0060BD  1               .endif
+0060BD  1               
+0060BD  1  60               rts
+0060BE  1               .endproc
+0060BE  1               
+0060BE  1               
+0060BE  1               ;;;---------------------------------------------------------
+0060BE  1               .proc SendInputState
+0060BE  1               ;;;---------------------------------------------------------
+0060BE  1               ;;; Send keyboard joystick and/or mouse state over the
+0060BE  1               ;;; serial port
+0060BE  1               ;;;
+0060BE  1               ;;; Algorithm:
+0060BE  1               ;;; - Send key state (if it changed)
+0060BE  1               ;;; - otherwise send open-apple state (if it changed)
+0060BE  1               ;;; - otherwise send closed-apple state (if it changed)
+0060BE  1               ;;; - otherwise send paddle 0 state (if it changed)
+0060BE  1               ;;; - (TODO: Mouse state)
+0060BE  1               ;;; - otherwise send sync byte
+0060BE  1               ;;;---------------------------------------------------------
+0060BE  1               
+0060BE  1  48 8A 48 98      SaveRegisters       ; Store registers
+0060C2  1  48           
+0060C3  1  18               clc
+0060C4  1               
+0060C4  1               ;;;--------------------------------------
+0060C4  1               ;;; Send key state, if it changed
+0060C4  1               
+0060C4  1               ;;; NOTE: Can't use KBDSTRB to detect key up -> key down transition
+0060C4  1               ;;; since the msb can change before the key code. Instead, consider
+0060C4  1               ;;; these cases:
+0060C4  1               ;;;
+0060C4  1               ;;;  OLD STATE    KBD       KBDSTRB    RESULT
+0060C4  1               ;;;   Up           Up        -          No-op
+0060C4  1               ;;;   Up           Down      -          Save and send key down
+0060C4  1               ;;;   Down         -         Up         Save and send key up
+0060C4  1               ;;;   Down         -         Down       Save and send key ONLY if different
+0060C4  1               ;;;
+0060C4  1               
+0060C4  1  AD 5B 60         lda LASTKB
+0060C7  1  D0 0E            bne KEY_WAS_DOWN
+0060C9  1               
+0060C9  1               KEY_WAS_UP:
+0060C9  1  AD 00 C0         lda KBD           ; Read keyboard
+0060CC  1  10 27            bpl END_KEY         ; - still up
+0060CE  1  8D 5B 60         sta LASTKB          ; Down, so save it
+0060D1  1  20 30 60         jsr SSC::Put          ; and send it
+0060D4  1  4C 86 61         jmp DONE
+0060D7  1               
+0060D7  1               KEY_WAS_DOWN:
+0060D7  1                   ; key was down - strobe should match
+0060D7  1                   ; unless the key changed or was released
+0060D7  1  AD 10 C0         lda KBDSTRB
+0060DA  1  30 0B            bmi KBDSTRB_DOWN
+0060DC  1               KBDSTRB_UP:
+0060DC  1  A9 00            lda #SIS_KBUP       ; Key was released
+0060DE  1  8D 5B 60         sta LASTKB          ; so save it
+0060E1  1  20 30 60         jsr SSC::Put          ; and send it
+0060E4  1  4C 86 61         jmp DONE
+0060E7  1               KBDSTRB_DOWN:
+0060E7  1  CD 5B 60         cmp LASTKB          ; Same key as last time?
+0060EA  1  F0 09            beq END_KEY         ; - no change
+0060EC  1  8D 5B 60         sta LASTKB          ; New key, so save it
+0060EF  1  20 30 60         jsr SSC::Put          ; and send it
+0060F2  1  4C 86 61         jmp DONE
+0060F5  1               
+0060F5  1               END_KEY:
+0060F5  1               
+0060F5  1               ;;;--------------------------------------
+0060F5  1               ;;; Send Open Apple state, if it changed
+0060F5  1               
+0060F5  1               ;;; TODO: Can simplify this code if we make the high bits the same
+0060F5  1               ;;; for both OA states and bit = 0 down: lda BUTN0 ; ROL ; LDA #0 ; ROL ; ORA #signature
+0060F5  1               
+0060F5  1               TEST_OA:
+0060F5  1  AD 61 C0         lda BUTN0        ; Test Open Apple state
+0060F8  1  30 10            bmi OA_IS_DOWN
+0060FA  1               OA_IS_UP:
+0060FA  1  A9 02            lda #SIS_OAUP
+0060FC  1  CD 5C 60         cmp LASTOA          ; Changed?
+0060FF  1  F0 19            beq END_OA          ; Nope
+006101  1  8D 5C 60         sta LASTOA          ; Yes, save it / send it!
+006104  1  20 30 60         jsr SSC::Put
+006107  1  4C 86 61         jmp DONE
+00610A  1               OA_IS_DOWN:
+00610A  1  A9 01            lda #SIS_OADOWN
+00610C  1  CD 5C 60         cmp LASTOA          ; Changed?
+00610F  1  F0 09            beq END_OA          ; Nope
+006111  1  8D 5C 60         sta LASTOA          ; Yes, save it / send it!
+006114  1  20 30 60         jsr SSC::Put
+006117  1  4C 86 61         jmp DONE
+00611A  1               
+00611A  1               END_OA:
+00611A  1               
+00611A  1               ;;;--------------------------------------
+00611A  1               ;;; Send Closed Apple state, if it changed
+00611A  1               
+00611A  1               TEST_CA:
+00611A  1  AD 62 C0         lda BUTN1             ; Has the Open Apple/Button 1 value changed?
+00611D  1  30 10            bmi CA_IS_DOWN
+00611F  1               CA_IS_UP:
+00611F  1  A9 04            lda #SIS_CAUP
+006121  1  CD 5D 60         cmp LASTCA          ; Changed?
+006124  1  F0 19            beq END_CA          ; Nope
+006126  1  8D 5D 60         sta LASTCA          ; Yes, save it
+006129  1  20 30 60         jsr SSC::Put          ; and send it
+00612C  1  4C 86 61         jmp DONE
+00612F  1               CA_IS_DOWN:
+00612F  1  A9 03            lda #SIS_CADOWN
+006131  1  CD 5D 60         cmp LASTCA          ; Changed?
+006134  1  F0 09            beq END_CA          ; Nope
+006136  1  8D 5D 60         sta LASTCA          ; Yes, save it
+006139  1  20 30 60         jsr SSC::Put          ; and send it
+00613C  1  4C 86 61         jmp DONE
+00613F  1               
+00613F  1               END_CA:
+00613F  1               
+00613F  1               .ifdef PADDLE_SUPPORT
+00613F  1               
+00613F  1               ;;;--------------------------------------
+00613F  1               ;;; Send Paddle 0 state, if it changed
+00613F  1               TEST_PDL0:
+00613F  1  A2 00            ldx #0
+006141  1  20 1E FB         jsr PREAD
+006144  1  98               tya
+006145  1  4A               lsr                 ; Shift to low nibble
+006146  1  4A               lsr
+006147  1  4A               lsr
+006148  1  4A               lsr
+006149  1  09 30            ora #SIS_PDL0       ; And mark it with the signature
+00614B  1  CD 5E 60         cmp LASTP0          ; Change?
+00614E  1  F0 09            beq END_PDL0        ; Nope
+006150  1  8D 5E 60         sta LASTP0          ; Yes, save it
+006153  1  20 30 60         jsr SSC::Put          ; and send it
+006156  1  4C 86 61         jmp DONE
+006159  1               END_PDL0:
+006159  1                   ; Chew up time so next paddle read will be correct
+006159  1                   ; TODO: Replace this with a "read both" strobes
+006159  1                   ; routine
+006159  1  EA EA EA EA  :   .repeat 11          ; By experiment, need 11 NOPs.
+00615D  1  EA EA EA EA  
+006161  1  EA EA EA     
+006164  1                   nop
+006164  1                   .endrep
+006164  1  C8               iny
+006165  1  D0 F2            bne :-
+006167  1               
+006167  1               ;;;--------------------------------------
+006167  1               ;;; Send Paddle 1 state, if it changed
+006167  1               TEST_PDL1:
+006167  1  A2 01            ldx #1
+006169  1  20 1E FB         jsr PREAD
+00616C  1  98               tya
+00616D  1  4A               lsr                 ; Shift to low nibble
+00616E  1  4A               lsr
+00616F  1  4A               lsr
+006170  1  4A               lsr
+006171  1  09 40            ora #SIS_PDL1       ; And mark it with the signature
+006173  1  CD 5F 60         cmp LASTP1          ; Change?
+006176  1  F0 09            beq END_PDL1        ; Nope
+006178  1  8D 5F 60         sta LASTP1          ; Yes, save it
+00617B  1  20 30 60         jsr SSC::Put          ; and send it
+00617E  1  4C 86 61         jmp DONE
+006181  1               END_PDL1:
+006181  1                   ; NOTE: No need to chew time like PDL0
+006181  1                   ; since data receive will make up for it; if we
+006181  1                   ; loop in SendInputState need to add it here
+006181  1               
+006181  1               .endif
+006181  1               
+006181  1               
+006181  1               ;;;--------------------------------------
+006181  1               ;;; No state changes so send sync byte
+006181  1               
+006181  1  A9 7F            lda #SIS_SYNC
+006183  1  20 30 60         jsr SSC::Put
+006186  1               
+006186  1               DONE:
+006186  1  68 A8 68 AA      RestoreRegisters
+00618A  1  68           
+00618B  1  60               rts
+00618C  1               
+00618C  1               .endproc
+00618C  1               
+00618C  1               
+00618C  1               ;;;-------------------------------------------------------------------
+00618C  1               ;;;
+00618C  1               ;;; Hi-res graphics routines
+00618C  1               ;;;
+00618C  1               ;;;-------------------------------------------------------------------
+00618C  1               
+00618C  1               ;;;---------------------------------------------------------
+00618C  1               .proc InitHires
+00618C  1               ;;;---------------------------------------------------------
+00618C  1               ;;; Set up the graphics display and pointers
+00618C  1               ;;;---------------------------------------------------------
+00618C  1  A9 20            lda #PLOTPAGE1   ; clear page 1
+00618E  1  85 E6            sta PLOTPAGE
+006190  1  20 B9 61         jsr ClearHires
+006193  1               
+006193  1  20 A3 61         jsr FlipHires    ; then show it and flip to 2
+006196  1  8D 57 C0         sta HIRES
+006199  1  8D 50 C0         sta TXTCLR
+00619C  1  8D 52 C0         sta MIXCLR
+00619F  1  8D 54 C0         sta LOWSCR
+0061A2  1               
+0061A2  1  60               rts
+0061A3  1               .endproc
+0061A3  1               
+0061A3  1               
+0061A3  1               ;;;---------------------------------------------------------
+0061A3  1               .proc FlipHires
+0061A3  1               ;;;---------------------------------------------------------
+0061A3  1               ;;; Call when done with the current plotting page
+0061A3  1               ;;; (selected in PLOTPAGE) and it will be shown and the
+0061A3  1               ;;; other page will be shown.
+0061A3  1               ;;;---------------------------------------------------------
+0061A3  1  A5 E6            lda PLOTPAGE        ; plotting on which page?
+0061A5  1  C9 20            cmp #PLOTPAGE1
+0061A7  1  F0 08            beq :+
+0061A9  1               
+0061A9  1  8D 55 C0         sta HISCR           ; page 2 - so show it
+0061AC  1  A9 20            lda #PLOTPAGE1      ; and plot on page 1
+0061AE  1  85 E6            sta PLOTPAGE
+0061B0  1  60               rts
+0061B1  1               
+0061B1  1  8D 54 C0     :   sta LOWSCR           ; page 1 - so show it
+0061B4  1  A9 40            lda #PLOTPAGE2      ; and plot on page 2
+0061B6  1  85 E6            sta PLOTPAGE
+0061B8  1  60               rts
+0061B9  1               .endproc
+0061B9  1               
+0061B9  1               
+0061B9  1               ;;;---------------------------------------------------------
+0061B9  1               .proc ClearHires
+0061B9  1               ;;;---------------------------------------------------------
+0061B9  1               ;;; Clear hires plotting page (selected in PLOTPAGE) to
+0061B9  1               ;;; black uses ZP_PTR; not terribly efficient
+0061B9  1               ;;;---------------------------------------------------------
+0061B9  1  A9 00           lda #0           ; Set up ZP_PTR as a pointer into the hires page
+0061BB  1  85 FA           sta ZP_PTR
+0061BD  1  A5 E6           lda PLOTPAGE
+0061BF  1  85 FB           sta ZP_PTR+1
+0061C1  1  A2 20           ldx #PAGESIZE    ; Clear this many pages
+0061C3  1  A9 00           lda #0           ; with black!
+0061C5  1  A8              tay
+0061C6  1  91 FA        :  sta (ZP_PTR),Y
+0061C8  1  C8              iny
+0061C9  1  D0 FB           bne :-
+0061CB  1  E6 FB           inc ZP_PTR+1
+0061CD  1  CA              dex
+0061CE  1  D0 F6           bne :-
+0061D0  1  60              rts
+0061D1  1               .endproc
 0061D1  1               

@@ -3,7 +3,6 @@
 ;;; Mouse
 ;;;
 ;;;-------------------------------------------------------------------
-
 .error "Mouse support not fully implemented"
 
 .proc Mouse
@@ -14,29 +13,31 @@
 
 ;;; For READMOUSE and POSMOUSE
 
-MOUSE_X_LSB = $0478     ; + slot        Low byte of absolute X position
-MOUSE_X_MSB = $0578     ; + slot        High byte of absolute X position
-MOUSE_Y_LSB = $04F8     ; + slot        Low byte of absolute Y position
-MOUSE_Y_MSB = $05F8     ; + slot        High byte of absolute Y position
-MOUSE_RSV1  = $0678     ; + slot        Reserved and used by the firmware
-MOUSE_RSV2  = $06F8     ; + slot        Reserved and used by the firmware
-MOUSE_BTN   = $0778     ; + slot        Button 0/1 interrupt status byte
-MOUSE_MODE  = $07F8     ; + slot        Mode byte
+MOUSE_X_LSB := $0478     ; + slot        Low byte of absolute X position
+MOUSE_X_MSB := $0578     ; + slot        High byte of absolute X position
+MOUSE_Y_LSB := $04F8     ; + slot        Low byte of absolute Y position
+MOUSE_Y_MSB := $05F8     ; + slot        High byte of absolute Y position
+MOUSE_RSV1  := $0678     ; + slot        Reserved and used by the firmware
+MOUSE_RSV2  := $06F8     ; + slot        Reserved and used by the firmware
+MOUSE_BTN   := $0778     ; + slot        Button 0/1 interrupt status byte
+MOUSE_MODE  := $07F8     ; + slot        Mode byte
 
 ;;; For CLAMPMOUSE:
 
-MOUSE_CMIN_LSB = $0478   ; low byte of low clamp
-MOUSE_CMIN_MSB = $0578   ; high byte of low clamp
-MOUSE_CMAX_LSB = $04F8   ; low byte of high clamp
-MOUSE_CMAX_MSB = $05F8   ; high byte of high clamp
+MOUSE_CMIN_LSB := $0478   ; low byte of low clamp
+MOUSE_CMIN_MSB := $0578   ; high byte of low clamp
+MOUSE_CMAX_LSB := $04F8   ; low byte of high clamp
+MOUSE_CMAX_MSB := $05F8   ; high byte of high clamp
 
-MOUSE_CLAMP_X   = 0     ; Value for A when setting X clamp with CLAMPMOUSE
-MOUSE_CLAMP_Y   = 1     ; Value for A when setting X clamp with CLAMPMOUSE
+MOUSE_CLAMP_X   := 0     ; Value for A when setting X clamp with CLAMPMOUSE
+MOUSE_CLAMP_Y   := 1     ; Value for A when setting X clamp with CLAMPMOUSE
 
 ;;; Mouse ID bytes
-MOUSEID_MAX     = 4
+MOUSEID_MAX     := 4
 MOUSEID_ADDR:   .byte $05, $07, $0b, $0c, $fb
 MOUSEID_VAL:    .byte $38, $18, $01, $20, $d6
+
+SLOT_BASE := $C000
 
 ;;;--------------------------------------------------
 ;;; Data
@@ -54,12 +55,12 @@ LAST_MY:    .byte $7f
 
 MOUSEPTR = $EB              ; Zero page location
 
-MOUSE_MIN_X    = $10
-MOUSE_MAX_X    = $1f
-MOUSE_CENTER_X = $17
-MOUSE_MIN_Y    = $20
-MOUSE_MAX_Y    = $2f
-MOUSE_CENTER_Y = $2f
+MOUSE_MIN_X    := $10
+MOUSE_MAX_X    := $1f
+MOUSE_CENTER_X := $17
+MOUSE_MIN_Y    := $20
+MOUSE_MAX_Y    := $2f
+MOUSE_CENTER_Y := $2f
 
 
 ;;;--------------------------------------------------
@@ -122,14 +123,14 @@ TESTSLOT:
     tya
     clc
     adc #>SLOT_BASE         ; Firmware is $c0 + slot
-    sta MOD_MOUSE_ID + 2    ; Update msb of signature test
+    sta slot_addr + 1       ; Update msb of signature test
     ldx #MOUSEID_MAX        ; This many signature bytes
 
 TESTID:
     lda MOUSEID_ADDR,x
     sta MOD_MOUSE_ID + 1    ; Update lsb of signature test
-MOD_MOUSE_ID:
-    lda SLOT_BASE
+        slot_addr := *+1
+    lda SLOT_BASE               ; Self-modified
     cmp MOUSEID_VAL,x       ; Does it match the signature?
     bne NOMATCH             ; Nope - try the next slot
     dex                     ; Yes! Keep testing
@@ -215,28 +216,30 @@ INITMOUSE:      ldy #$19
     lda (MOUSEPTR),Y    ; Get the routine entry point
     sta TOMOUSE_lsb     ; Patch the JMP instruction
     txa                 ; Restore the value in A
-.endproc
-    ; fall through
 
 ;;; The following operand bytes must be patched by the
 ;;; initialization code which detects the mouse.
 
-BANK       = $C054
+BANK       := $C054
 
 TOMOUSE:
+        TOMOUSE_Cn := *+1
     ldx #$C1            ; Set up slot in $Cn form in X
+        TOMOUSE_n0 := *+1
     ldy #$10            ; Set up slot in $n0 form in Y
     php                 ; Save interrupt state
     sei                 ; No interrupts while calling
     bit BANK
-    jsr SLOT_BASE       ; Go to the mouse routine
+        TOMOUSE_slot := *+1
+    jsr 0               ; Go to the mouse routine
     plp                 ; Restore interrupt state
     rts
+.endproc
 
-TOMOUSE_Cn   = TOMOUSE + 1
-TOMOUSE_n0   = TOMOUSE + 3
-TOMOUSE_lsb  = TOMOUSE + 10
-TOMOUSE_msb  = TOMOUSE + 11
+TOMOUSE_Cn   := GoMouse::TOMOUSE_Cn
+TOMOUSE_n0   := GoMouse::TOMOUSE_n0
+TOMOUSE_lsb  := GoMouse::TOMOUSE_slot
+TOMOUSE_msb  := GoMouse::TOMOUSE_slot+1
 
 
 ;;; TODO: Turn this into a proper delta-sending routine

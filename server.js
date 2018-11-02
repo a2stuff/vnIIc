@@ -1,17 +1,12 @@
+// ============================================================
+//
+// Page Stuff
+//
+// ============================================================
+
 const $ = document.querySelector.bind(document);
 
 let dither_factor = 0.9;
-
-const palette = [
-  /* Black1 */ [0x00, 0x00, 0x00],
-  /* Green  */ [0x2f, 0xbc, 0x1a],
-  /* Violet */ [0xd0, 0x43, 0xe5],
-  /* White1 */ [0xff, 0xff, 0xff],
-  /* Black2 */ [0x00, 0x00, 0x00],
-  /* Orange */ [0xd0, 0x6a, 0x1a],
-  /* Blue   */ [0x2f, 0x95, 0xe5],
-  /* White2 */ [0xff, 0xff, 0xff]
-];
 
 $('#dither').addEventListener('input', e => {
   const input = e.target;
@@ -70,6 +65,23 @@ $('#start').addEventListener('click', async e => {
     alert('getDisplayMedia support or access denied');
   }
 });
+
+// ============================================================
+//
+// Image Stuff
+//
+// ============================================================
+
+const palette = [
+  /* Black1 */ [0x00, 0x00, 0x00],
+  /* Green  */ [0x2f, 0xbc, 0x1a],
+  /* Violet */ [0xd0, 0x43, 0xe5],
+  /* White1 */ [0xff, 0xff, 0xff],
+  /* Black2 */ [0x00, 0x00, 0x00],
+  /* Orange */ [0xd0, 0x6a, 0x1a],
+  /* Blue   */ [0x2f, 0x95, 0xe5],
+  /* White2 */ [0xff, 0xff, 0xff]
+];
 
 // Distance in 3-space
 function distance(r1,g1,b1,r2,g2,b2) {
@@ -256,6 +268,12 @@ function convert_to_hires(indexes, buffer) {
   }
 }
 
+// ============================================================
+//
+// Serial Stuff
+//
+// ============================================================
+
 $('#bootstrap').addEventListener('click', async e => {
 
   alert('On the Apple II, type:\n\n' +
@@ -290,3 +308,47 @@ $('#bootstrap').addEventListener('click', async e => {
   send('\x03'); // Ctrl+C - Exit Monitor
   send(`CALL ${CLIENT_ADDR}`); // Execute client
 });
+
+
+async function getSerialPort() {
+
+  const ports = await SerialPort.requestPorts();
+  if (!ports.length) throw new Error('No ports');
+  const port = new SerialPort(ports[0].path);
+
+  const reader = port.in.getReader();
+  const writer = port.out.getWriter();
+
+  // Generator yielding one byte at a time from |reader|.
+  const gen = (async function*() {
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) return;
+      for (const byte of value)
+        yield byte;
+    }
+  })();
+
+  return {
+    // Read N bytes from port, returns plain array.
+    read: async function read(n) {
+      if (n <= 0) throw new Error();
+      const result = [];
+      for await (const byte of gen) {
+        result.push(byte);
+        if (--n === 0) break;
+      }
+      return result;
+    },
+
+    // Write Uint8Array of bytes to port.
+    write: async function(bytes) {
+      await writer.write(bytes);
+    },
+
+    // Close port.
+    close: async function() {
+      await writer.close();
+    }
+  };
+}

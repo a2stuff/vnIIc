@@ -274,6 +274,8 @@ function convert_to_hires(indexes, buffer) {
 //
 // ============================================================
 
+let port;
+
 $('#bootstrap').addEventListener('click', async e => {
 
   alert('On the Apple II, type:\n\n' +
@@ -284,12 +286,9 @@ $('#bootstrap').addEventListener('click', async e => {
   const CLIENT_ADDR = 0x6000;
   const CLIENT_FILE = 'client/client.bin';
 
-  function send(str) {
-    // TODO: Send this over serial, obviously...
-    console.log(str);
-  }
+  port = getSerialPort();
 
-  send('CALL -151'); // Enter Monitor
+  await port.write('CALL -151'); // Enter Monitor
 
   const response = await fetch(CLIENT_FILE);
   if (!response.ok)
@@ -302,11 +301,17 @@ $('#bootstrap').addEventListener('click', async e => {
             .map(b => ('00' + b.toString(16).toUpperCase()).substr(-2))
             .join(' ');
 
-    send(str);
+    await port.write(str);
   }
 
-  send('\x03'); // Ctrl+C - Exit Monitor
-  send(`CALL ${CLIENT_ADDR}`); // Execute client
+  await port.write('\x03'); // Ctrl+C - Exit Monitor
+  await port.write(`CALL ${CLIENT_ADDR}`); // Execute client
+
+
+  const splash = await fetch('res/SPLASH.PIC.BIN');
+  if (!splash.ok)
+    throw new Error(response.statusText);
+  await port.write(new Uint8Array(await splash.arrayBuffer()));
 });
 
 
@@ -352,3 +357,58 @@ async function getSerialPort() {
     }
   };
 }
+
+// ============================================================
+//
+// Protocol Implementation
+//
+// ============================================================
+
+$('#stream').addEventListener('click', async e => {
+
+  const state = {
+    keyboard: 0,
+
+    button0: 0,
+    button1: 0,
+
+    paddle0: 0,
+    paddle1: 0,
+
+    mousex: 0,
+    mousey: 0,
+    mousebtn: 0
+  };
+
+
+  while (true) {
+    const command = await port.read(1);
+    const size = await port.read(1);
+    const data = size ? await port.read(size) : [];
+
+    switch (command) {
+
+      // Keyboard
+    case 0x00: state.keyboard = data[0]; break;
+
+      // Buttons
+    case 0x10: state.buttom0 = data[0]; break;
+    case 0x11: state.button1 = data[0]; break;
+
+      // Paddles
+    case 0x20: state.paddle0 = data[0]; break;
+    case 0x21: state.paddle0 = data[0]; break;
+
+      // Mouse
+    case 0x30: state.mousex = data[0] | (data[1] << 8); break;
+    case 0x31: state.mousey = data[0] | (data[1] << 8); break;
+    case 0x32: state.mousebtn = data[0]; break;
+
+      // Screen
+    case 0x80: port.write(hires_buffer); break;
+
+    default:
+      console.warn(`Unexpected protocol command: ${command}`);
+    }
+  }
+});

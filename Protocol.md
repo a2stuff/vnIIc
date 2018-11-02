@@ -16,3 +16,6 @@ Client sends commands:
     * $32 _size=1_ _MOUSEBTN_      mouse button state
 * Screen
     * $80 _size=0_                 please send screen; client waits for 8192 byte buffer
+
+
+Switch mouse to be signed 8-bit deltax, deltay ?

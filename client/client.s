@@ -38,6 +38,26 @@ MAX_SLOT        := 7             ; Maximum slot # on an Apple II
 
 ZP_PTR  := $FA                   ; Write cursor location on zero page
 
+;;;-------------------------------------------------------------------
+;;; Protocol:
+;;;-------------------------------------------------------------------
+
+.proc Protocol
+        Keyboard := $00
+
+        Button0  := $10
+        Button1  := $11
+
+        Paddle0  := $20
+        Paddle1  := $21
+
+        MouseX   := $30
+        MouseY   := $31
+        MouseBtn := $32
+
+        Screen   := $80
+.endproc
+
 
 ;;;-------------------------------------------------------------------
 ;;;
@@ -64,19 +84,6 @@ PSPEED: .byte   SSC::BPS_115k   ; Hardcoded for Apple IIc (TODO: Allow configura
 PSLOT:  .byte   2               ; Hardcoded for Apple IIc (TODO: Allow configuration)
 PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemented)
 
-;;; Keyboard state
-LASTKB: .byte   0
-LASTOA: .byte   0
-LASTCA: .byte   0
-
-    .ifdef PADDLE_SUPPORT
-
-;;; Paddle state
-LASTP0: .byte   0
-LASTP1: .byte   0
-
-    .endif                      ; PADDLE_SUPPORT
-
 
 ;;;---------------------------------------------------------
 ;;; Initialize the application, and enter the main loop
@@ -87,8 +94,7 @@ LASTP1: .byte   0
         jsr     InitHires       ; Initialize Hi-Res graphics
         jsr     InitInput       ; Initialize input devices
         jsr     MainLoop
-
-                                ; fall through
+        ;; fall through
 .endproc
 
 ;;;---------------------------------------------------------
@@ -100,7 +106,6 @@ LASTP1: .byte   0
         sta     TXTSET
         rts
 .endproc
-
 
 ;;;-------------------------------------------------------------------
 ;;;
@@ -118,7 +123,9 @@ LASTP1: .byte   0
 ;;;    bne :+              ; Nope
 
 :       jsr     ReceivePage
+        ;; Input is sent every 256 bytes (32 times per page)
         jsr     FlipHires
+
         jmp     :-              ; TODO: define an exit trigger
         rts
 .endproc
@@ -132,6 +139,12 @@ LASTP1: .byte   0
 ;;;  * Send 1 byte (input state)
 
 .proc ReceivePage
+        lda     #Protocol::Screen
+        jsr     SSC::Put
+        lda     #0              ; data size
+        jsr     SSC::Put
+
+
         lda     #0              ; set up write pointer
         sta     ZP_PTR
         lda     PAGE
@@ -139,12 +152,13 @@ LASTP1: .byte   0
         ldx     #PAGESIZE       ; plan to receive this many pages
         ldy     #0
 
-:       jsr     SSC::Get        ; TODO: look for escape codes in the sequence
+:       jsr     SSC::Get
         sta     (ZP_PTR),Y
         iny
         bne     :-              ; Do a full page...
 
-        jsr     SendInputState  ; brief moment to send data back upstream
+        ;; Interleave to maintain responsiveness
+        jsr     SendInputState
 
         inc     ZP_PTR+1
         dex
@@ -158,52 +172,12 @@ LASTP1: .byte   0
 ;;; Input device routines
 ;;;
 ;;;-------------------------------------------------------------------
-;;; Protocol:
-;;;  $7f - $ff - key down, ASCII code + $80
-;;;  otherwise, a transition:
-;;;
-        SIS_KBUP = $00          ; Key up
-        SIS_OADOWN = $01        ; Open Apple transitioned to down
-        SIS_OAUP = $02          ; Open Apple transitioned to up
-        SIS_CADOWN = $03        ; Closed Apple transitioned to down
-        SIS_CAUP = $04          ; Closed Apple transitioned to up
-;;;
-;;;  $05 - $0f : reserved
-;;;
-        SIS_MX = $10            ; Mouse X high nibble
-        SIS_MY = $20            ; Mouse Y high nibble
-        SIS_PDL0 = $30          ; Paddle 0 high nibble
-        SIS_PDL1 = $40          ; Paddle 1 high nibble
-;;;
-;;;  $50 - $7e : reserved
-;;;
-        SIS_SYNC = $7f
 
 ;;;---------------------------------------------------------
 ;;; Initialize input devices and storage for detecting
 ;;; state transitions
 
 .proc InitInput
-
-;;; Init keyboard state
-        lda     #SIS_KBUP
-        sta     LASTKB
-
-;;; Init Open/Closed Apple states
-        lda     #SIS_OAUP       ; NOTE: Don't store OA state as it fluctuates
-        sta     LASTOA
-        lda     #SIS_CAUP       ; NOTE: Don't store CA state as it fluctuates
-        sta     LASTCA
-
-    .ifdef PADDLE_SUPPORT
-;;; Init Paddle state
-        lda     #SIS_PDL0
-        ora     #8              ; Middle of range 0...15
-        sta     LASTP0
-        lda     #SIS_PDL1
-        ora     #8              ; Middle of range 0...15
-        sta     LASTP1
-    .endif
 
     .ifdef MOUSE_SUPPORT
         jsr     Mouse::FindMouse
@@ -214,24 +188,29 @@ LASTP1: .byte   0
 
 
 ;;;---------------------------------------------------------
-;;; Send keyboard joystick and/or mouse state over the
-;;; serial port
-;;;
-;;; Algorithm:
-;;; - Send key state (if it changed)
-;;; - otherwise send open-apple state (if it changed)
-;;; - otherwise send closed-apple state (if it changed)
-;;; - otherwise send paddle 0 state (if it changed)
-;;; - (TODO: Mouse state)
-;;; - otherwise send sync byte
+;;; Send a full set of input state updates.
+
+;;; Assumes time to transmit is roughly comparable to time
+;;; to measure input state, therefore only sending changes is
+;;; not worthwhile in most cases.
 
 .proc SendInputState
+        jsr     MaybeSendKeyboard
+        jsr     SendButtons
 
-        SaveRegisters           ; Store registers
-        clc
+    .ifdef PADDLE_SUPPORT
+        jsr     SendPaddles
+    .endif
 
-;;;--------------------------------------
-;;; Send key state, if it changed
+    .ifdef MOUSE_SUPPORT
+        jsr     SendMouse
+    .endif
+
+.endproc
+
+
+;;;------------------------------------------------------------
+;;; Keyboard
 
 ;;; NOTE: Can't use KBDSTRB to detect key up -> key down transition
 ;;; since the msb can change before the key code. Instead, consider
@@ -244,148 +223,98 @@ LASTP1: .byte   0
 ;;;   Down         -         Down       Save and send key ONLY if different
 ;;;
 
-        lda     LASTKB
-        bne     KEY_WAS_DOWN
+last_kb:        .byte   0
 
-KEY_WAS_UP:
+.proc MaybeSendKeyboard
+        lda     last_kb
+        bne     key_was_down
+
+key_was_up:
+        ;; Key was up - send only if now down.
         lda     KBD             ; Read keyboard
-        bpl     END_KEY         ; - still up
-        sta     LASTKB          ; Down, so save it
-        jsr     SSC::Put        ; and send it
-        jmp     DONE
+        bpl     done            ; Do nothing if it is still up.
+        jmp     send            ; Otherwise send.
 
-KEY_WAS_DOWN:
-                                ; key was down - strobe should match
-                                ; unless the key changed or was released
+key_was_down:
+        ;; Key was down - strobe should match
+        ;; unless the key changed or was released.
         lda     KBDSTRB
-        bmi     KBDSTRB_DOWN
-KBDSTRB_UP:
-        lda     #SIS_KBUP       ; Key was released
-        sta     LASTKB          ; so save it
-        jsr     SSC::Put        ; and send it
-        jmp     DONE
-KBDSTRB_DOWN:
-        cmp     LASTKB          ; Same key as last time?
-        beq     END_KEY         ; - no change
-        sta     LASTKB          ; New key, so save it
-        jsr     SSC::Put        ; and send it
-        jmp     DONE
+        bmi     kbdstrb_down
 
-END_KEY:
+kbdstrb_up:
+        lda     #0              ; Now released
+        jmp     send
 
-;;;--------------------------------------
-;;; Send Open Apple state, if it changed
+kbdstrb_down:
+        cmp     last_kb         ; Same key as last time?
+        beq     done            ; - no change, don't send.
+        jmp     send
 
-;;; TODO: Can simplify this code if we make the high bits the same
-;;; for both OA states and bit = 0 down: lda BUTN0 ; ROL ; LDA #0 ; ROL ; ORA #signature
-
-TEST_OA:
-        lda     BUTN0           ; Test Open Apple state
-        bmi     OA_IS_DOWN
-OA_IS_UP:
-        lda     #SIS_OAUP
-        cmp     LASTOA          ; Changed?
-        beq     END_OA          ; Nope
-        sta     LASTOA          ; Yes, save it / send it!
+send:   sta     last_kb
+        lda     Protocol::Keyboard
         jsr     SSC::Put
-        jmp     DONE
-OA_IS_DOWN:
-        lda     #SIS_OADOWN
-        cmp     LASTOA          ; Changed?
-        beq     END_OA          ; Nope
-        sta     LASTOA          ; Yes, save it / send it!
+        lda     #1              ; Data size
         jsr     SSC::Put
-        jmp     DONE
+        lda     last_kb
+        jsr     SSC::Put
 
-END_OA:
+done:   rts
+.endproc
 
-;;;--------------------------------------
-;;; Send Closed Apple state, if it changed
+;;;------------------------------------------------------------
+;;; Buttons
 
-TEST_CA:
-        lda     BUTN1           ; Has the Open Apple/Button 1 value changed?
-        bmi     CA_IS_DOWN
-CA_IS_UP:
-        lda     #SIS_CAUP
-        cmp     LASTCA          ; Changed?
-        beq     END_CA          ; Nope
-        sta     LASTCA          ; Yes, save it
-        jsr     SSC::Put        ; and send it
-        jmp     DONE
-CA_IS_DOWN:
-        lda     #SIS_CADOWN
-        cmp     LASTCA          ; Changed?
-        beq     END_CA          ; Nope
-        sta     LASTCA          ; Yes, save it
-        jsr     SSC::Put        ; and send it
-        jmp     DONE
+.proc SendButtons
 
-END_CA:
+        lda     Protocol::Button0
+        jsr     SSC::Put
+        lda     #1              ; Data size
+        jsr     SSC::Put
+        lda     BUTN0
+        jsr     SSC::Put
+
+        lda     Protocol::Button1
+        jsr     SSC::Put
+        lda     #1              ; Data size
+        jsr     SSC::Put
+        lda     BUTN1
+        jsr     SSC::Put
+
+        rts
+.endproc
+
+;;;------------------------------------------------------------
+;;; Paddles
 
     .ifdef PADDLE_SUPPORT
+.proc SendPaddles
 
-;;;--------------------------------------
-;;; Send Paddle 0 state, if it changed
-TEST_PDL0:
+        lda     Protocol::Paddle0
+        jsr     SSC::Put
+        lda     #1              ; Data size
+        jsr     SSC::Put
+
         ldx     #0
         jsr     PREAD
         tya
-        lsr                     ; Shift to low nibble
-        lsr
-        lsr
-        lsr
-        ora     #SIS_PDL0       ; And mark it with the signature
-        cmp     LASTP0          ; Change?
-        beq     END_PDL0        ; Nope
-        sta     LASTP0          ; Yes, save it
-        jsr     SSC::Put        ; and send it
-        jmp     DONE
-END_PDL0:
-                                ; Chew up time so next paddle read will be correct
-                                ; TODO: Replace this with a "read both" strobes
-                                ; routine
-:       .repeat 11              ; By experiment, need 11 NOPs.
-        nop
-        .endrep
-        iny
-        bne     :-
+        jsr     SSC::Put
 
-;;;--------------------------------------
-;;; Send Paddle 1 state, if it changed
-TEST_PDL1:
+        ;; Assumes at least 11 cycles to send, so
+        ;; timer has a chance to reset.
+
+        lda     Protocol::Paddle1
+        jsr     SSC::Put
+        lda     #1              ; Data size
+        jsr     SSC::Put
+
         ldx     #1
         jsr     PREAD
         tya
-        lsr                     ; Shift to low nibble
-        lsr
-        lsr
-        lsr
-        ora     #SIS_PDL1       ; And mark it with the signature
-        cmp     LASTP1          ; Change?
-        beq     END_PDL1        ; Nope
-        sta     LASTP1          ; Yes, save it
-        jsr     SSC::Put        ; and send it
-        jmp     DONE
-END_PDL1:
-                                ; NOTE: No need to chew time like PDL0
-                                ; since data receive will make up for it; if we
-                                ; loop in SendInputState need to add it here
-
-    .endif
-
-
-;;;--------------------------------------
-;;; No state changes so send sync byte
-
-        lda     #SIS_SYNC
         jsr     SSC::Put
 
-DONE:
-        RestoreRegisters
         rts
-
 .endproc
-
+    .endif
 
 ;;;-------------------------------------------------------------------
 ;;;

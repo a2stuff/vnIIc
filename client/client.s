@@ -5,7 +5,7 @@
 ;;;-------------------------------------------------------------------
 
         PADDLE_SUPPORT = 1
-;;; MOUSE_SUPPORT  = 1
+        MOUSE_SUPPORT  = 1
 
         .include "apple2.inc"
 
@@ -35,8 +35,6 @@ HCLR    := $F3F2                      ; Clear current hires screen to black
 ;;;---------------------------------------------------------
 
 MAX_SLOT        := 7             ; Maximum slot # on an Apple II
-
-ZP_PTR  := $FA                   ; Write cursor location on zero page
 
 ;;;-------------------------------------------------------------------
 ;;; Protocol:
@@ -132,13 +130,14 @@ PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemente
 
 
 ;;;---------------------------------------------------------
-;;; Pull a hi-res page down over serial
+;;; Request a hires page, sending input state along every
+;;; 256 bytes.
 ;;;
-;;; Protocol is:
-;;;  * Recieve 256 bytes (graphic data)
-;;;  * Send 1 byte (input state)
 
 .proc ReceivePage
+
+ptr     := $FA
+
         lda     #Protocol::Screen
         jsr     SSC::Put
         lda     #0              ; data size
@@ -146,21 +145,21 @@ PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemente
 
 
         lda     #0              ; set up write pointer
-        sta     ZP_PTR
+        sta     ptr
         lda     PAGE
-        sta     ZP_PTR+1
+        sta     ptr+1
         ldx     #PAGESIZE       ; plan to receive this many pages
         ldy     #0
 
 :       jsr     SSC::Get
-        sta     (ZP_PTR),Y
+        sta     (ptr),Y
         iny
         bne     :-              ; Do a full page...
 
         ;; Interleave to maintain responsiveness
         jsr     SendInputState
 
-        inc     ZP_PTR+1
+        inc     ptr+1
         dex
         bne     :-              ; ...as many pages as we need
         rts
@@ -203,7 +202,7 @@ PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemente
     .endif
 
     .ifdef MOUSE_SUPPORT
-        jsr     SendMouse
+        jsr     Mouse::SendMouse
     .endif
 
 .endproc
@@ -299,8 +298,7 @@ done:   rts
         tya
         jsr     SSC::Put
 
-        ;; Assumes at least 11 cycles to send, so
-        ;; timer has a chance to reset.
+        ;; Need to wait 3ms between reads.
 
         lda     Protocol::Paddle1
         jsr     SSC::Put

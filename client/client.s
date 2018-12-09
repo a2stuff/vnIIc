@@ -19,14 +19,18 @@ PAGE    := $E6                  ; Active hires plotting page (Applesoft)
 PAGE1   := $20
 PAGE2   := $40
 
-PAGESIZE        := $20            ; Size of hi-res screen in pages
+PAGESIZE        := $20             ; Size of hi-res screen in pages
+
+;;;---------------------------------------------------------
+;;; I/O
+;;;---------------------------------------------------------
+
+PADDL0  := $C064
+PTRIG   := $C070
 
 ;;;---------------------------------------------------------
 ;;; ROM routines
 ;;;---------------------------------------------------------
-
-PREAD   := $FB1E                  ; Monitor paddle reading routine, call
-                                ; with paddle # in X, returns value in Y
 
 HCLR    := $F3F2                      ; Clear current hires screen to black
 
@@ -34,7 +38,7 @@ HCLR    := $F3F2                      ; Clear current hires screen to black
 ;;; Other
 ;;;---------------------------------------------------------
 
-MAX_SLOT        := 7             ; Maximum slot # on an Apple II
+MAX_SLOT        := 7              ; Maximum slot # on an Apple II
 
 ;;;-------------------------------------------------------------------
 ;;; Protocol:
@@ -294,7 +298,7 @@ done:   rts
         jsr     SSC::Put
 
         ldx     #0
-        jsr     PREAD
+        jsr     pread
         tya
         jsr     SSC::Put
 
@@ -306,11 +310,29 @@ done:   rts
         jsr     SSC::Put
 
         ldx     #1
-        jsr     PREAD
+        jsr     pread
         tya
         jsr     SSC::Put
 
         rts
+
+.proc pread
+        ;; Let any previous timer reset
+:       lda     PADDL0,x
+        bmi     :-
+
+        ;; Read paddle
+        lda     PTRIG
+        ldy     #0
+        nop
+        nop
+:       lda     PADDL0,X
+        bpl     done
+        iny
+        bne     :-
+done:   rts
+.endproc
+
 .endproc
     .endif
 

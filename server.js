@@ -63,7 +63,10 @@ $('#start').addEventListener('click', async e => {
 
   } catch (e) {
     alert('getDisplayMedia support or access denied');
+    return;
   }
+
+  startStreaming();
 });
 
 // ============================================================
@@ -364,7 +367,7 @@ async function getSerialPort() {
 //
 // ============================================================
 
-$('#stream').addEventListener('click', async e => {
+async function startStreaming() {
 
   const state = {
     keyboard: 0,
@@ -411,4 +414,4 @@ $('#stream').addEventListener('click', async e => {
       console.warn(`Unexpected protocol command: ${command}`);
     }
   }
-});
+}

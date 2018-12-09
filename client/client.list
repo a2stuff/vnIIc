@@ -110,14 +110,18 @@ Current file: client.s
 000000r 1               PAGE1   := $20
 000000r 1               PAGE2   := $40
 000000r 1               
-000000r 1               PAGESIZE        := $20            ; Size of hi-res screen in pages
+000000r 1               PAGESIZE        := $20             ; Size of hi-res screen in pages
+000000r 1               
+000000r 1               ;;;---------------------------------------------------------
+000000r 1               ;;; I/O
+000000r 1               ;;;---------------------------------------------------------
+000000r 1               
+000000r 1               PADDL0  := $C064
+000000r 1               PTRIG   := $C070
 000000r 1               
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               ;;; ROM routines
 000000r 1               ;;;---------------------------------------------------------
-000000r 1               
-000000r 1               PREAD   := $FB1E                  ; Monitor paddle reading routine, call
-000000r 1                                               ; with paddle # in X, returns value in Y
 000000r 1               
 000000r 1               HCLR    := $F3F2                      ; Clear current hires screen to black
 000000r 1               
@@ -125,7 +129,7 @@ Current file: client.s
 000000r 1               ;;; Other
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               
-000000r 1               MAX_SLOT        := 7             ; Maximum slot # on an Apple II
+000000r 1               MAX_SLOT        := 7              ; Maximum slot # on an Apple II
 000000r 1               
 000000r 1               ;;;-------------------------------------------------------------------
 000000r 1               ;;; Protocol:
@@ -610,7 +614,7 @@ Current file: client.s
 00618A  1               .proc AppEntry
 00618A  1  AD 88 61             lda     PSLOT           ; Use slot 2
 00618D  1  20 07 60             jsr     SSC::Init       ; Initialize Super Serial Card
-006190  1  20 60 62             jsr     InitHires       ; Initialize Hi-Res graphics
+006190  1  20 75 62             jsr     InitHires       ; Initialize Hi-Res graphics
 006193  1  20 D4 61             jsr     InitInput       ; Initialize input devices
 006196  1  20 A3 61             jsr     MainLoop
 006199  1                       ;; fall through
@@ -643,7 +647,7 @@ Current file: client.s
 0061A3  1               
 0061A3  1  20 AD 61     :       jsr     ReceivePage
 0061A6  1                       ;; Input is sent every 256 bytes (32 times per page)
-0061A6  1  20 77 62             jsr     FlipHires
+0061A6  1  20 8C 62             jsr     FlipHires
 0061A9  1               
 0061A9  1  4C A3 61             jmp     :-              ; TODO: define an exit trigger
 0061AC  1  60                   rts
@@ -815,7 +819,7 @@ Current file: client.s
 006240  1  20 30 60             jsr     SSC::Put
 006243  1               
 006243  1  A2 00                ldx     #0
-006245  1  20 1E FB             jsr     PREAD
+006245  1  20 60 62             jsr     pread
 006248  1  98                   tya
 006249  1  20 30 60             jsr     SSC::Put
 00624C  1               
@@ -827,56 +831,74 @@ Current file: client.s
 006253  1  20 30 60             jsr     SSC::Put
 006256  1               
 006256  1  A2 01                ldx     #1
-006258  1  20 1E FB             jsr     PREAD
+006258  1  20 60 62             jsr     pread
 00625B  1  98                   tya
 00625C  1  20 30 60             jsr     SSC::Put
 00625F  1               
 00625F  1  60                   rts
-006260  1               .endproc
-006260  1                   .endif
 006260  1               
-006260  1               ;;;-------------------------------------------------------------------
-006260  1               ;;;
-006260  1               ;;; Hi-res graphics routines
-006260  1               ;;;
-006260  1               ;;;-------------------------------------------------------------------
-006260  1               
-006260  1               ;;;---------------------------------------------------------
-006260  1               ;;; Set up the graphics display and pointers
-006260  1               
-006260  1               .proc InitHires
-006260  1  A9 20                lda     #PAGE1          ; clear page 1
-006262  1  85 E6                sta     PAGE
-006264  1  20 F2 F3             jsr     HCLR
-006267  1               
-006267  1  20 77 62             jsr     FlipHires       ; then show it and flip to 2
-00626A  1  8D 57 C0             sta     HIRES
-00626D  1  8D 50 C0             sta     TXTCLR
-006270  1  8D 52 C0             sta     MIXCLR
-006273  1  8D 54 C0             sta     LOWSCR
-006276  1               
-006276  1  60                   rts
-006277  1               .endproc
-006277  1               
-006277  1               
-006277  1               ;;;---------------------------------------------------------
-006277  1               ;;; Call when done with the current plotting page
-006277  1               ;;; (selected in PAGE) and it will be shown and the
-006277  1               ;;; other page will be shown.
-006277  1               
-006277  1               .proc FlipHires
-006277  1  A5 E6                lda     PAGE            ; plotting on which page?
-006279  1  C9 20                cmp     #PAGE1
-00627B  1  F0 08                beq     :+
-00627D  1               
-00627D  1  8D 55 C0             sta     HISCR           ; page 2 - so show it
-006280  1  A9 20                lda     #PAGE1          ; and plot on page 1
-006282  1  85 E6                sta     PAGE
-006284  1  60                   rts
-006285  1               
-006285  1  8D 54 C0     :       sta     LOWSCR          ; page 1 - so show it
-006288  1  A9 40                lda     #PAGE2          ; and plot on page 2
-00628A  1  85 E6                sta     PAGE
-00628C  1  60                   rts
-00628D  1               .endproc
-00628D  1               
+006260  1               .proc pread
+006260  1                       ;; Let any previous timer reset
+006260  1  BD 64 C0     :       lda     PADDL0,x
+006263  1  30 FB                bmi     :-
+006265  1               
+006265  1                       ;; Read paddle
+006265  1  AD 70 C0             lda     PTRIG
+006268  1  A0 00                ldy     #0
+00626A  1  EA                   nop
+00626B  1  EA                   nop
+00626C  1  BD 64 C0     :       lda     PADDL0,X
+00626F  1  10 03                bpl     done
+006271  1  C8                   iny
+006272  1  D0 F8                bne     :-
+006274  1  60           done:   rts
+006275  1               .endproc
+006275  1               
+006275  1               .endproc
+006275  1                   .endif
+006275  1               
+006275  1               ;;;-------------------------------------------------------------------
+006275  1               ;;;
+006275  1               ;;; Hi-res graphics routines
+006275  1               ;;;
+006275  1               ;;;-------------------------------------------------------------------
+006275  1               
+006275  1               ;;;---------------------------------------------------------
+006275  1               ;;; Set up the graphics display and pointers
+006275  1               
+006275  1               .proc InitHires
+006275  1  A9 20                lda     #PAGE1          ; clear page 1
+006277  1  85 E6                sta     PAGE
+006279  1  20 F2 F3             jsr     HCLR
+00627C  1               
+00627C  1  20 8C 62             jsr     FlipHires       ; then show it and flip to 2
+00627F  1  8D 57 C0             sta     HIRES
+006282  1  8D 50 C0             sta     TXTCLR
+006285  1  8D 52 C0             sta     MIXCLR
+006288  1  8D 54 C0             sta     LOWSCR
+00628B  1               
+00628B  1  60                   rts
+00628C  1               .endproc
+00628C  1               
+00628C  1               
+00628C  1               ;;;---------------------------------------------------------
+00628C  1               ;;; Call when done with the current plotting page
+00628C  1               ;;; (selected in PAGE) and it will be shown and the
+00628C  1               ;;; other page will be shown.
+00628C  1               
+00628C  1               .proc FlipHires
+00628C  1  A5 E6                lda     PAGE            ; plotting on which page?
+00628E  1  C9 20                cmp     #PAGE1
+006290  1  F0 08                beq     :+
+006292  1               
+006292  1  8D 55 C0             sta     HISCR           ; page 2 - so show it
+006295  1  A9 20                lda     #PAGE1          ; and plot on page 1
+006297  1  85 E6                sta     PAGE
+006299  1  60                   rts
+00629A  1               
+00629A  1  8D 54 C0     :       sta     LOWSCR          ; page 1 - so show it
+00629D  1  A9 40                lda     #PAGE2          ; and plot on page 2
+00629F  1  85 E6                sta     PAGE
+0062A1  1  60                   rts
+0062A2  1               .endproc
+0062A2  1               

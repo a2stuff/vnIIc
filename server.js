@@ -385,8 +385,8 @@ async function startStreaming() {
 
 
   while (true) {
-    const command = await port.read(1);
-    const size = await port.read(1);
+    const command = await port.read(1)[0];
+    const size = await port.read(1)[0];
     const data = size ? await port.read(size) : [];
 
     switch (command) {

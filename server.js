@@ -33,7 +33,7 @@ $('#start').addEventListener('click', async e => {
   clearInterval(interval_id);
 
   try {
-    const mediaStream = await navigator.getDisplayMedia({video:true});
+    const mediaStream = await navigator.mediaDevices.getDisplayMedia({video:true});
     const vid = document.createElement('video');
     vid.srcObject = mediaStream;
     vid.play();

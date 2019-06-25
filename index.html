@@ -1,4 +1,5 @@
 <!doctype html>
+<meta charset=utf-8>
 <title>vnIIc</title>
 <link rel=icon href="res/icon128.png">
 <link rel=stylesheet href="https://fonts.googleapis.com/css?family=Audiowide">
@@ -20,6 +21,15 @@ body {
 
 section { font-size: 80%; }
 
+body:not(.supports-serial) #serial-support::before,
+body:not(.supports-getDisplayMedia) #stream-support::before {
+  content: "👎 not supported"
+}
+body.supports-serial #serial-support::before,
+body.supports-getDisplayMedia #stream-support::before {
+  content: "👍 supported!"
+}
+
 </style>
 
 <div id=title>
@@ -34,7 +44,8 @@ Desktop streaming to an Apple II with Super Serial Card
 <section id=requirements>
 <h2>Requirements</h2>
 <ul>
-  <li>Modern browser with support for <a target=_blank href="https://w3c.github.io/mediacapture-screen-share/">Screen Capture</a> (<a target=_blank href="https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia#Browser_compatibility">list</a>) and <a target=_blank href="https://wicg.github.io/serial/">Web Serial</a> (circa mid-2019, not yet available)
+  <li>Browser support for <a target=_blank href="https://w3c.github.io/mediacapture-screen-share/">Screen Capture</a>: <span id=stream-support></span>
+  <li>Browser support for <a target=_blank href="https://wicg.github.io/serial/">Web Serial</a>: <span id=serial-support></span>
   <li>Apple II with Super Serial Card in slot 2. (e.g. Apple IIc, Apple IIgs, Laser 128)
   <li>Serial connection between your modern computer and the Apple, such as via a <a target=_blank href="https://en.wikipedia.org/wiki/Null_modem">null-modem</a> cable and USB to RS-232 adapter from <a target=_blank href="http://retrofloppy.com/products/">RetroFloppy</a>.
 </ul>

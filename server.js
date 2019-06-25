@@ -6,6 +6,20 @@
 
 const $ = document.querySelector.bind(document);
 
+if ('serial' in navigator) {
+  document.body.classList.add('supports-serial');
+} else {
+  $('#bootstrap').disabled = true;
+}
+if ('mediaDevices' in navigator &&
+    'getDisplayMedia' in navigator.mediaDevices) {
+  document.body.classList.add('supports-getDisplayMedia');
+} else {
+  $('#start').disabled = true;
+  $('#dither').disabled = true;
+  $('#save').disabled = true;
+}
+
 let dither_factor = 0.9;
 
 $('#dither').addEventListener('input', e => {

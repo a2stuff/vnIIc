@@ -1,4 +1,4 @@
-ca65 V2.16 - Git f5e9b401
+ca65 V2.18 - Git 93b6efcb
 Main file   : client.s
 Current file: client.s
 
@@ -8,8 +8,8 @@ Current file: client.s
 000000r 1               ;;;
 000000r 1               ;;;-------------------------------------------------------------------
 000000r 1               
-000000r 1                       PADDLE_SUPPORT = 1
-000000r 1                       MOUSE_SUPPORT  = 1
+000000r 1                       PADDLE_SUPPORT = 0
+000000r 1                       MOUSE_SUPPORT  = 0
 000000r 1               
 000000r 1                       .include "apple2.inc"
 000000r 2               
@@ -125,6 +125,7 @@ Current file: client.s
 000000r 1               
 000000r 1               HCLR    := $F3F2                      ; Clear current hires screen to black
 000000r 1               
+000000r 1               
 000000r 1               ;;;---------------------------------------------------------
 000000r 1               ;;; Other
 000000r 1               ;;;---------------------------------------------------------
@@ -159,7 +160,7 @@ Current file: client.s
 000000r 1               ;;;-------------------------------------------------------------------
 000000r 1               
 000000r 1                       .org $6000
-006000  1  4C 8A 61             jmp     AppEntry
+006000  1  4C 86 61             jmp     AppEntry
 006003  1               
 006003  1                       .include "ssc.inc"
 006003  2               ;;;-------------------------------------------------------------------
@@ -207,16 +208,16 @@ Current file: client.s
 00600D  2  AA                   tax
 00600E  2  A9 0B                lda     #CMND_NRDI      ; Command register: no parity, RTS on, DTR on, no interrupts
 006010  2  9D 02 C0             sta     $C002,X
-006013  2  AC 87 61             ldy     PSPEED          ; Control register: look up by baud rate (8 data bits, 1 stop bit)
+006013  2  AC 83 61             ldy     PSPEED          ; Control register: look up by baud rate (8 data bits, 1 stop bit)
 006016  2  B9 03 60             lda     BPSCTRL,Y
 006019  2  9D 03 C0             sta     $C003,X
-00601C  2  8E 3C 60             stx     MOD_UADATA_1    ; Modify references to
-00601F  2  8E 49 60             stx     MOD_UADATA_2    ; UADATA to point at
-006022  2  8E 55 60             stx     MOD_UADATA_3    ; correct slot (UADATA+S0)
+00601C  2  8E 3A 60             stx     MOD_UADATA_1    ; Modify references to
+00601F  2  8E 45 60             stx     MOD_UADATA_2    ; UADATA to point at
+006022  2  8E 51 60             stx     MOD_UADATA_3    ; correct slot (UADATA+S0)
 006025  2  E8                   inx
 006026  2  8E 32 60             stx     MOD_UASTAT_1    ; Modify reference to
-006029  2  8E 40 60             stx     MOD_UASTAT_2    ; UASTAT to point at
-00602C  2  8E 4D 60             stx     MOD_UASTAT_3    ; correct slot (UASTAT+S0)
+006029  2  8E 3E 60             stx     MOD_UASTAT_2    ; UASTAT to point at
+00602C  2  8E 49 60             stx     MOD_UASTAT_3    ; correct slot (UASTAT+S0)
 00602F  2  60                   rts
 006030  2               .endproc
 006030  2               
@@ -228,677 +229,682 @@ Current file: client.s
 006030  2  48                   pha                     ; Push A onto the stack
 006031  2               MOD_UASTAT_1    := *+1
 006031  2  AD 89 C0     :       lda     UASTAT          ; Check status bits
-006034  2  29 70                and     #$70
-006036  2  C9 10                cmp     #$10
-006038  2  D0 F7                bne     :-              ; Output register is full, so loop
-00603A  2  68                   pla
-00603B  2               MOD_UADATA_1    := *+1
-00603B  2  8D 88 C0             sta     UADATA          ; Put character
-00603E  2  60                   rts
-00603F  2               .endproc
-00603F  2               MOD_UASTAT_1    := Put::MOD_UASTAT_1
-00603F  2               MOD_UADATA_1    := Put::MOD_UADATA_1
-00603F  2               
-00603F  2               ;;;---------------------------------------------------------
-00603F  2               ;;; Read a character from the serial port to the accumulator
-00603F  2               
-00603F  2               .proc Get
-00603F  2               MOD_UASTAT_2    := *+1
-00603F  2  AD 89 C0             lda     UASTAT          ; Check status bits
-006042  2  29 68                and     #$68
-006044  2  C9 08                cmp     #$8
-006046  2  D0 F7                bne     Get             ; Input register empty, loop
-006048  2               MOD_UADATA_2    := *+1
-006048  2  AD 88 C0             lda     UADATA          ; Get character
-00604B  2  60                   rts
-00604C  2               .endproc
-00604C  2               MOD_UASTAT_2    := Get::MOD_UASTAT_2
-00604C  2               MOD_UADATA_2    := Get::MOD_UADATA_2
-00604C  2               
-00604C  2               ;;;---------------------------------------------------------
-00604C  2               ;;; Check if the serial port has pending data
-00604C  2               
-00604C  2               .proc HasData
-00604C  2               MOD_UASTAT_3    := *+1
-00604C  2  AD 89 C0             lda     UASTAT          ; Check status bits
-00604F  2  29 68                and     #$68
-006051  2  C9 08                cmp     #$8
+006034  2  29 10                and     #$10
+006036  2  F0 F9                beq     :-              ; Output register is full, so loop
+006038  2  68                   pla
+006039  2               MOD_UADATA_1    := *+1
+006039  2  8D 88 C0             sta     UADATA          ; Put character
+00603C  2  60                   rts
+00603D  2               .endproc
+00603D  2               MOD_UASTAT_1    := Put::MOD_UASTAT_1
+00603D  2               MOD_UADATA_1    := Put::MOD_UADATA_1
+00603D  2               
+00603D  2               ;;;---------------------------------------------------------
+00603D  2               ;;; Read a character from the serial port to the accumulator
+00603D  2               
+00603D  2               .proc Get
+00603D  2               MOD_UASTAT_2    := *+1
+00603D  2  AD 89 C0             lda     UASTAT          ; Check status bits
+006040  2  29 08                and     #$8
+006042  2  F0 F9                beq     Get             ; Input register empty, loop
+006044  2               MOD_UADATA_2    := *+1
+006044  2  AD 88 C0             lda     UADATA          ; Get character
+006047  2  60                   rts
+006048  2               .endproc
+006048  2               MOD_UASTAT_2    := Get::MOD_UASTAT_2
+006048  2               MOD_UADATA_2    := Get::MOD_UADATA_2
+006048  2               
+006048  2               ;;;---------------------------------------------------------
+006048  2               ;;; Check if the serial port has pending data
+006048  2               
+006048  2               .proc HasData
+006048  2               MOD_UASTAT_3    := *+1
+006048  2  AD 89 C0             lda     UASTAT          ; Check status bits
+00604B  2  29 68                and     #$68
+00604D  2  C9 08                cmp     #$8
+00604F  2  60                   rts
+006050  2               .endproc
+006050  2               MOD_UASTAT_3    := HasData::MOD_UASTAT_3
+006050  2               
+006050  2               
+006050  2               ;;;---------------------------------------------------------
+006050  2               ;;; Clean up serial port
+006050  2               
+006050  2               .proc Reset
+006050  2               MOD_UADATA_3    := *+1
+006050  2  2C 88 C0             bit     UADATA
 006053  2  60                   rts
 006054  2               .endproc
-006054  2               MOD_UASTAT_3    := HasData::MOD_UASTAT_3
+006054  2               MOD_UADATA_3    := Reset::MOD_UADATA_3
 006054  2               
+006054  2               .endproc
 006054  2               
-006054  2               ;;;---------------------------------------------------------
-006054  2               ;;; Clean up serial port
+006054  1               
+006054  1                   .ifdef MOUSE_SUPPORT
+006054  1                       .include "mouse.inc"
+006054  2               ;;;-------------------------------------------------------------------
+006054  2               ;;;
+006054  2               ;;; Mouse
+006054  2               ;;;
+006054  2               ;;;-------------------------------------------------------------------
+006054  2                       ;;         .error "Mouse support not fully implemented"
 006054  2               
-006054  2               .proc Reset
-006054  2               MOD_UADATA_3    := *+1
-006054  2  2C 88 C0             bit     UADATA
-006057  2  60                   rts
-006058  2               .endproc
-006058  2               MOD_UADATA_3    := Reset::MOD_UADATA_3
-006058  2               
-006058  2               .endproc
-006058  2               
-006058  1               
-006058  1                   .ifdef MOUSE_SUPPORT
-006058  1                       .include "mouse.inc"
-006058  2               ;;;-------------------------------------------------------------------
-006058  2               ;;;
-006058  2               ;;; Mouse
-006058  2               ;;;
-006058  2               ;;;-------------------------------------------------------------------
-006058  2                       ;;         .error "Mouse support not fully implemented"
-006058  2               
-006058  2               .proc Mouse
-006058  2               
-006058  2               ;;;--------------------------------------------------
-006058  2               ;;; Mouse Screen Holes
-006058  2               ;;;--------------------------------------------------
-006058  2               
-006058  2               ;;; For ReadMouse and PosMouse
-006058  2               
-006058  2               MOUSE_X_LSB     := $0478        ; + slot        Low byte of X coordinate
-006058  2               MOUSE_Y_LSB     := $04F8        ; + slot        Low byte of Y coordinate
-006058  2               MOUSE_X_MSB     := $0578        ; + slot        High byte of X coordinate
-006058  2               MOUSE_Y_MSB     := $05F8        ; + slot        High byte of Y coordinate
-006058  2               MOUSE_RSV1      := $0678        ; + slot        Reserved
-006058  2               MOUSE_RSV2      := $06F8        ; + slot        Reserved
-006058  2               MOUSE_STATUS    := $0778        ; + slot        Status byte
-006058  2                       ;; 7    Button down
-006058  2                       ;; 6    Button was down on last read and still down
-006058  2                       ;; 5    Movement since last read
-006058  2                       ;; 4    Reserved
-006058  2                       ;; 3    Interrupt from VBlInt
-006058  2                       ;; 2    Interrupt from button
-006058  2                       ;; 1    Interrupt from movement
-006058  2                       ;; 0    Reserved
-006058  2               MOUSE_MODE      := $07F8        ; + slot        Mode byte
-006058  2                       ;; 7-4  Reserved
-006058  2                       ;; 3    VBlInt active
-006058  2                       ;; 2    VBL interrupt on button
-006058  2                       ;; 1    VBL interrupt on movement
-006058  2                       ;; 0    Mouse active
-006058  2               
-006058  2               ;;; Scratch area for ClampMouse:
-006058  2               
-006058  2               MOUSE_CMIN_LSB  := $0478        ; Low byte of clamping minimum
-006058  2               MOUSE_CMAX_LSB  := $04F8        ; Low byte of clamping maximum
-006058  2               MOUSE_CMIN_MSB  := $0578        ; High byte of clamping minimum
-006058  2               MOUSE_CMAX_MSB  := $05F8        ; High byte of clamping maximum
-006058  2               
-006058  2               ;;;--------------------------------------------------
-006058  2               ;;; Mouse Constants
-006058  2               ;;;--------------------------------------------------
-006058  2               
-006058  2               MOUSE_CLAMP_X   := 0            ; Value for A when setting X clamp with ClampMouse
-006058  2               MOUSE_CLAMP_Y   := 1            ; Value for A when setting X clamp with ClampMouse
-006058  2               
-006058  2               ;;; Mouse ID bytes
-006058  2               MOUSEID_MAX     := 4
-006058  2  05 07 0B 0C  MOUSEID_ADDR:   .byte   $05, $07, $0b, $0c, $fb
-00605C  2  FB           
-00605D  2  38 18 01 20  MOUSEID_VAL:    .byte   $38, $18, $01, $20, $d6
-006061  2  D6           
+006054  2               .proc Mouse
+006054  2               
+006054  2               ;;;--------------------------------------------------
+006054  2               ;;; Mouse Screen Holes
+006054  2               ;;;--------------------------------------------------
+006054  2               
+006054  2               ;;; For ReadMouse and PosMouse
+006054  2               
+006054  2               MOUSE_X_LSB     := $0478        ; + slot        Low byte of X coordinate
+006054  2               MOUSE_Y_LSB     := $04F8        ; + slot        Low byte of Y coordinate
+006054  2               MOUSE_X_MSB     := $0578        ; + slot        High byte of X coordinate
+006054  2               MOUSE_Y_MSB     := $05F8        ; + slot        High byte of Y coordinate
+006054  2               MOUSE_RSV1      := $0678        ; + slot        Reserved
+006054  2               MOUSE_RSV2      := $06F8        ; + slot        Reserved
+006054  2               MOUSE_STATUS    := $0778        ; + slot        Status byte
+006054  2                       ;; 7    Button down
+006054  2                       ;; 6    Button was down on last read and still down
+006054  2                       ;; 5    Movement since last read
+006054  2                       ;; 4    Reserved
+006054  2                       ;; 3    Interrupt from VBlInt
+006054  2                       ;; 2    Interrupt from button
+006054  2                       ;; 1    Interrupt from movement
+006054  2                       ;; 0    Reserved
+006054  2               MOUSE_MODE      := $07F8        ; + slot        Mode byte
+006054  2                       ;; 7-4  Reserved
+006054  2                       ;; 3    VBlInt active
+006054  2                       ;; 2    VBL interrupt on button
+006054  2                       ;; 1    VBL interrupt on movement
+006054  2                       ;; 0    Mouse active
+006054  2               
+006054  2               ;;; Scratch area for ClampMouse:
+006054  2               
+006054  2               MOUSE_CMIN_LSB  := $0478        ; Low byte of clamping minimum
+006054  2               MOUSE_CMAX_LSB  := $04F8        ; Low byte of clamping maximum
+006054  2               MOUSE_CMIN_MSB  := $0578        ; High byte of clamping minimum
+006054  2               MOUSE_CMAX_MSB  := $05F8        ; High byte of clamping maximum
+006054  2               
+006054  2               ;;;--------------------------------------------------
+006054  2               ;;; Mouse Constants
+006054  2               ;;;--------------------------------------------------
+006054  2               
+006054  2               MOUSE_CLAMP_X   := 0            ; Value for A when setting X clamp with ClampMouse
+006054  2               MOUSE_CLAMP_Y   := 1            ; Value for A when setting X clamp with ClampMouse
+006054  2               
+006054  2               ;;; Mouse ID bytes
+006054  2               MOUSEID_MAX     := 4
+006054  2  05 07 0B 0C  MOUSEID_ADDR:   .byte   $05, $07, $0b, $0c, $fb
+006058  2  FB           
+006059  2  38 18 01 20  MOUSEID_VAL:    .byte   $38, $18, $01, $20, $d6
+00605D  2  D6           
+00605E  2               
+00605E  2               SLOT_BASE       := $C000
+00605E  2               
+00605E  2               ;;;--------------------------------------------------
+00605E  2               ;;; Mouse firmware routine
+00605E  2               ;;;--------------------------------------------------
+00605E  2               
+00605E  2               SetMouse        := $12          ; A=mode; C=0 on success
+00605E  2               ServeMouse      := $13          ; C=0 mouse interrupt, C=1 other
+00605E  2               ReadMouse       := $14
+00605E  2               ClearMouse      := $15
+00605E  2               PosMouse        := $16
+00605E  2               ClampMouse      := $17
+00605E  2               HomeMouse       := $18
+00605E  2               InitMouse       := $19
+00605E  2               
+00605E  2               .macro MOUSE_CALL routine
+00605E  2                       ldy     routine
+00605E  2                       jmp     CallMouse
+00605E  2               .endmacro
+00605E  2               
+00605E  2               ;;;--------------------------------------------------
+00605E  2               ;;; Data
+00605E  2               ;;;--------------------------------------------------
+00605E  2               
+00605E  2               ;;; Mouse
+00605E  2  00           mouse_slot:     .byte   0       ; mouse slot, or 0 if none
+00605F  2  00           mouse_fw_hi:    .byte   0       ; mouse slot as $Cn
+006060  2  00           mouse_op:       .byte   0       ; mouse slot as $n0
+006061  2               
+006061  2               mouse_ptr       := $EB          ; Zero page location
+006061  2               
+006061  2               ;;;--------------------------------------------------
+006061  2               ;;; Routines
+006061  2               ;;;--------------------------------------------------
+006061  2               
+006061  2               
+006061  2               MOUSE_CLAMP_MIN := $10
+006061  2               MOUSE_CLAMP_MAX := $1F
+006061  2               MOUSE_CENTER    := $17
+006061  2               MOUSE_POS_MASK  := $0F
+006061  2               
+006061  2               
+006061  2               ;;;--------------------------------------------------
+006061  2               ;;; Macros for common mouse operations
+006061  2               ;;;--------------------------------------------------
+006061  2               
+006061  2               ;;;----------------------------------------
+006061  2               .macro DoClampMouse   axis, min, max
+006061  2               ;;;----------------------------------------
+006061  2               ;;; axis: MOUSE_CLAMP_X or MOUSE_CLAMP_Y
+006061  2               ;;; min:  minimum value (2 byte)
+006061  2               ;;; max:  maximum value (2 byte)
+006061  2               ;;;----------------------------------------
+006061  2                       lda     #<min
+006061  2                       sta     MOUSE_CMIN_LSB
+006061  2                       lda     #>min
+006061  2                       sta     MOUSE_CMIN_MSB
+006061  2                       lda     #<max
+006061  2                       sta     MOUSE_CMAX_LSB
+006061  2                       lda     #>max
+006061  2                       sta     MOUSE_CMAX_MSB
+006061  2                       lda     #axis
+006061  2                       MOUSE_CALL ClampMouse
+006061  2               .endmacro
+006061  2               
+006061  2               ;;;----------------------------------------
+006061  2               .macro DoPosMouse   px, py
+006061  2               ;;;----------------------------------------
+006061  2                       ldx     mouse_slot
+006061  2                       lda     #<px
+006061  2                       sta     MOUSE_X_LSB,x
+006061  2                       lda     #>px
+006061  2                       sta     MOUSE_X_MSB,x
+006061  2                       lda     #<py
+006061  2                       sta     MOUSE_Y_LSB,x
+006061  2                       lda     #>py
+006061  2                       sta     MOUSE_Y_MSB,x
+006061  2                       MOUSE_CALL PosMouse
+006061  2               .endmacro
+006061  2               
+006061  2               ;;;----------------------------------------
+006061  2               .macro DoSetMouse   mode
+006061  2               ;;;----------------------------------------
+006061  2                       lda     #mode
+006061  2                       MOUSE_CALL SetMouse
+006061  2               .endmacro
+006061  2               
+006061  2               
+006061  2               ;;;---------------------------------------------------------
+006061  2               ;;; Find and initialize the mouse port
+006061  2               
+006061  2               .proc FindMouse
+006061  2               
+006061  2               ;;; Reference: http://home.swbell.net/rubywand/R034MOUSEPRG.TXT
+006061  2               
+006061  2  78                   sei                     ; No interrupts while we're getting set up
 006062  2               
-006062  2               SLOT_BASE       := $C000
+006062  2                       ;; Find mouse card by scanning slots for ID bytes
 006062  2               
-006062  2               ;;;--------------------------------------------------
-006062  2               ;;; Mouse firmware routine
-006062  2               ;;;--------------------------------------------------
-006062  2               
-006062  2               SetMouse        := $12          ; A=mode; C=0 on success
-006062  2               ServeMouse      := $13          ; C=0 mouse interrupt, C=1 other
-006062  2               ReadMouse       := $14
-006062  2               ClearMouse      := $15
-006062  2               PosMouse        := $16
-006062  2               ClampMouse      := $17
-006062  2               HomeMouse       := $18
-006062  2               InitMouse       := $19
-006062  2               
-006062  2               .macro MOUSE_CALL routine
-006062  2                       ldy     routine
-006062  2                       jmp     CallMouse
-006062  2               .endmacro
-006062  2               
-006062  2               ;;;--------------------------------------------------
-006062  2               ;;; Data
-006062  2               ;;;--------------------------------------------------
-006062  2               
-006062  2               ;;; Mouse
-006062  2  00           mouse_slot:     .byte   0       ; mouse slot, or 0 if none
-006063  2  00           mouse_fw_hi:    .byte   0       ; mouse slot as $Cn
-006064  2  00           mouse_op:       .byte   0       ; mouse slot as $n0
-006065  2               
-006065  2               mouse_ptr       := $EB          ; Zero page location
-006065  2               
-006065  2               ;;;--------------------------------------------------
-006065  2               ;;; Routines
-006065  2               ;;;--------------------------------------------------
-006065  2               
-006065  2               
-006065  2               MOUSE_CLAMP_MIN := $10
-006065  2               MOUSE_CLAMP_MAX := $1F
-006065  2               MOUSE_CENTER    := $17
-006065  2               MOUSE_POS_MASK  := $0F
-006065  2               
-006065  2               
-006065  2               ;;;--------------------------------------------------
-006065  2               ;;; Macros for common mouse operations
-006065  2               ;;;--------------------------------------------------
-006065  2               
-006065  2               ;;;----------------------------------------
-006065  2               .macro DoClampMouse   axis, min, max
-006065  2               ;;;----------------------------------------
-006065  2               ;;; axis: MOUSE_CLAMP_X or MOUSE_CLAMP_Y
-006065  2               ;;; min:  minimum value (2 byte)
-006065  2               ;;; max:  maximum value (2 byte)
-006065  2               ;;;----------------------------------------
-006065  2                       lda     #<min
-006065  2                       sta     MOUSE_CMIN_LSB
-006065  2                       lda     #>min
-006065  2                       sta     MOUSE_CMIN_MSB
-006065  2                       lda     #<max
-006065  2                       sta     MOUSE_CMAX_LSB
-006065  2                       lda     #>max
-006065  2                       sta     MOUSE_CMAX_MSB
-006065  2                       lda     #axis
-006065  2                       MOUSE_CALL ClampMouse
-006065  2               .endmacro
-006065  2               
-006065  2               ;;;----------------------------------------
-006065  2               .macro DoPosMouse   px, py
-006065  2               ;;;----------------------------------------
-006065  2                       ldx     mouse_slot
-006065  2                       lda     #<px
-006065  2                       sta     MOUSE_X_LSB,x
-006065  2                       lda     #>px
-006065  2                       sta     MOUSE_X_MSB,x
-006065  2                       lda     #<py
-006065  2                       sta     MOUSE_Y_LSB,x
-006065  2                       lda     #>py
-006065  2                       sta     MOUSE_Y_MSB,x
-006065  2                       MOUSE_CALL PosMouse
-006065  2               .endmacro
-006065  2               
-006065  2               ;;;----------------------------------------
-006065  2               .macro DoSetMouse   mode
-006065  2               ;;;----------------------------------------
-006065  2                       lda     #mode
-006065  2                       MOUSE_CALL SetMouse
-006065  2               .endmacro
-006065  2               
-006065  2               
-006065  2               ;;;---------------------------------------------------------
-006065  2               ;;; Find and initialize the mouse port
-006065  2               
-006065  2               .proc FindMouse
-006065  2               
-006065  2               ;;; Reference: http://home.swbell.net/rubywand/R034MOUSEPRG.TXT
-006065  2               
-006065  2  78                   sei                     ; No interrupts while we're getting set up
-006066  2               
-006066  2                       ;; Find mouse card by scanning slots for ID bytes
-006066  2               
-006066  2  A0 07                ldy     #MAX_SLOT       ; Start search in slot 7
-006068  2               
-006068  2               slot_loop:
-006068  2  8C 62 60             sty     mouse_slot      ; Save for later
-00606B  2  98                   tya
-00606C  2  18                   clc
-00606D  2  69 C0                adc     #>SLOT_BASE     ; Firmware is $Cn
-00606F  2  8D 7C 60             sta     slot_addr + 1   ; Update msb of signature test
-006072  2  A2 04                ldx     #MOUSEID_MAX    ; This many signature bytes
-006074  2               
-006074  2  BD 58 60     :       lda     MOUSEID_ADDR,x
-006077  2  8D 7B 60             sta     slot_addr       ; Update lsb of signature test
-00607A  2               
-00607A  2               slot_addr       := *+1
-00607A  2  AD 00 C0             lda     SLOT_BASE       ; Self-modified
-00607D  2  DD 5D 60             cmp     MOUSEID_VAL,x   ; Does it match the signature?
-006080  2  D0 06                bne     no_match        ; Nope - try the next slot
-006082  2  CA                   dex                     ; Yes! Keep testing
-006083  2  10 EF                bpl     :-              ; Fall through if all done
-006085  2  4C 8F 60             jmp     found
-006088  2               
-006088  2               no_match:
-006088  2  88                   dey                     ; Didn't match
-006089  2  D0 DD                bne     slot_loop       ; Keep looking until slot 0
-00608B  2  8C 62 60             sty     mouse_slot      ; Oops, no mouse - make a note
-00608E  2  60                   rts                     ; and bail
-00608F  2               
-00608F  2                       ;; Store results needed for call ($Cn and $n0)
-00608F  2               
-00608F  2  98           found:  tya                     ; Slot is in y
-006090  2  09 C0                ora     #>SLOT_BASE     ; Compute $Cn - needed for calls
-006092  2  8D 63 60             sta     mouse_fw_hi
-006095  2               
-006095  2  98                   tya
-006096  2  0A                   asl                     ; Compute $n0 - needed for calls
-006097  2  0A                   asl
-006098  2  0A                   asl
-006099  2  0A                   asl
-00609A  2  8D 64 60             sta     mouse_op
-00609D  2               
-00609D  2                       ;; Initialize and configure mouse card
-00609D  2               
-00609D  2  A4 19 4C FD          MOUSE_CALL InitMouse    ; reset, clamp to 0-1023 x/y
-0060A1  2  60           
-0060A2  2               
-0060A2  2  A9 01 A4 12          DoSetMouse $01          ; mouse on, no interrupts
-0060A6  2  4C FD 60     
-0060A9  2                                               ; TODO: test carry bit result (set = error)
-0060A9  2               
-0060A9  2                       ;; Clamp for deltas
-0060A9  2  A9 10 8D 78          DoClampMouse MOUSE_CLAMP_X, MOUSE_CLAMP_MIN, MOUSE_CLAMP_MAX
-0060AD  2  04 A9 00 8D  
-0060B1  2  78 05 A9 1F  
-0060B5  2  8D F8 04 A9  
-0060B9  2  00 8D F8 05  
-0060BD  2  A9 00 A4 17  
-0060C1  2  4C FD 60     
-0060C4  2  A9 10 8D 78          DoClampMouse MOUSE_CLAMP_Y, MOUSE_CLAMP_MIN, MOUSE_CLAMP_MAX
-0060C8  2  04 A9 00 8D  
-0060CC  2  78 05 A9 1F  
-0060D0  2  8D F8 04 A9  
-0060D4  2  00 8D F8 05  
-0060D8  2  A9 01 A4 17  
-0060DC  2  4C FD 60     
-0060DF  2               
-0060DF  2  AE 62 60 A9          DoPosMouse MOUSE_CENTER, MOUSE_CENTER
-0060E3  2  17 9D 78 04  
-0060E7  2  A9 00 9D 78  
-0060EB  2  05 A9 17 9D  
-0060EF  2  F8 04 A9 00  
-0060F3  2  9D F8 05 A4  
-0060F7  2  16 4C FD 60  
-0060FB  2               
-0060FB  2  58                   cli                     ; Enable interrupts so mouse can function
-0060FC  2               
-0060FC  2  60                   rts
-0060FD  2               .endproc
-0060FD  2               
-0060FD  2               ;;;--------------------------------------------------
-0060FD  2               ;;; Call mouse firmware, param in A, routine in Y
-0060FD  2               
-0060FD  2               .proc CallMouse
-0060FD  2  48                   pha                     ; Save A (param)
-0060FE  2  AE 63 60             ldx     mouse_fw_hi     ; $Cn
-006101  2  86 EC                stx     mouse_ptr+1
-006103  2  A9 00                lda     #0
+006062  2  A0 07                ldy     #MAX_SLOT       ; Start search in slot 7
+006064  2               
+006064  2               slot_loop:
+006064  2  8C 5E 60             sty     mouse_slot      ; Save for later
+006067  2  98                   tya
+006068  2  18                   clc
+006069  2  69 C0                adc     #>SLOT_BASE     ; Firmware is $Cn
+00606B  2  8D 78 60             sta     slot_addr + 1   ; Update msb of signature test
+00606E  2  A2 04                ldx     #MOUSEID_MAX    ; This many signature bytes
+006070  2               
+006070  2  BD 54 60     :       lda     MOUSEID_ADDR,x
+006073  2  8D 77 60             sta     slot_addr       ; Update lsb of signature test
+006076  2               
+006076  2               slot_addr       := *+1
+006076  2  AD 00 C0             lda     SLOT_BASE       ; Self-modified
+006079  2  DD 59 60             cmp     MOUSEID_VAL,x   ; Does it match the signature?
+00607C  2  D0 06                bne     no_match        ; Nope - try the next slot
+00607E  2  CA                   dex                     ; Yes! Keep testing
+00607F  2  10 EF                bpl     :-              ; Fall through if all done
+006081  2  4C 8B 60             jmp     found
+006084  2               
+006084  2               no_match:
+006084  2  88                   dey                     ; Didn't match
+006085  2  D0 DD                bne     slot_loop       ; Keep looking until slot 0
+006087  2  8C 5E 60             sty     mouse_slot      ; Oops, no mouse - make a note
+00608A  2  60                   rts                     ; and bail
+00608B  2               
+00608B  2                       ;; Store results needed for call ($Cn and $n0)
+00608B  2               
+00608B  2  98           found:  tya                     ; Slot is in y
+00608C  2  09 C0                ora     #>SLOT_BASE     ; Compute $Cn - needed for calls
+00608E  2  8D 5F 60             sta     mouse_fw_hi
+006091  2               
+006091  2  98                   tya
+006092  2  0A                   asl                     ; Compute $n0 - needed for calls
+006093  2  0A                   asl
+006094  2  0A                   asl
+006095  2  0A                   asl
+006096  2  8D 60 60             sta     mouse_op
+006099  2               
+006099  2                       ;; Initialize and configure mouse card
+006099  2               
+006099  2  A4 19 4C F9          MOUSE_CALL InitMouse    ; reset, clamp to 0-1023 x/y
+00609D  2  60           
+00609E  2               
+00609E  2  A9 01 A4 12          DoSetMouse $01          ; mouse on, no interrupts
+0060A2  2  4C F9 60     
+0060A5  2                                               ; TODO: test carry bit result (set = error)
+0060A5  2               
+0060A5  2                       ;; Clamp for deltas
+0060A5  2  A9 10 8D 78          DoClampMouse MOUSE_CLAMP_X, MOUSE_CLAMP_MIN, MOUSE_CLAMP_MAX
+0060A9  2  04 A9 00 8D  
+0060AD  2  78 05 A9 1F  
+0060B1  2  8D F8 04 A9  
+0060B5  2  00 8D F8 05  
+0060B9  2  A9 00 A4 17  
+0060BD  2  4C F9 60     
+0060C0  2  A9 10 8D 78          DoClampMouse MOUSE_CLAMP_Y, MOUSE_CLAMP_MIN, MOUSE_CLAMP_MAX
+0060C4  2  04 A9 00 8D  
+0060C8  2  78 05 A9 1F  
+0060CC  2  8D F8 04 A9  
+0060D0  2  00 8D F8 05  
+0060D4  2  A9 01 A4 17  
+0060D8  2  4C F9 60     
+0060DB  2               
+0060DB  2  AE 5E 60 A9          DoPosMouse MOUSE_CENTER, MOUSE_CENTER
+0060DF  2  17 9D 78 04  
+0060E3  2  A9 00 9D 78  
+0060E7  2  05 A9 17 9D  
+0060EB  2  F8 04 A9 00  
+0060EF  2  9D F8 05 A4  
+0060F3  2  16 4C F9 60  
+0060F7  2               
+0060F7  2  58                   cli                     ; Enable interrupts so mouse can function
+0060F8  2               
+0060F8  2  60                   rts
+0060F9  2               .endproc
+0060F9  2               
+0060F9  2               ;;;--------------------------------------------------
+0060F9  2               ;;; Call mouse firmware, param in A, routine in Y
+0060F9  2               
+0060F9  2               .proc CallMouse
+0060F9  2  48                   pha                     ; Save A (param)
+0060FA  2  AE 5F 60             ldx     mouse_fw_hi     ; $Cn
+0060FD  2  86 EC                stx     mouse_ptr+1
+0060FF  2  A9 00                lda     #0
+006101  2  85 EB                sta     mouse_ptr
+006103  2  B1 EB                lda     (mouse_ptr),y  ; Look up routine offset
 006105  2  85 EB                sta     mouse_ptr
-006107  2  B1 EB                lda     (mouse_ptr),y  ; Look up routine offset
-006109  2  85 EB                sta     mouse_ptr
+006107  2               
+006107  2  68                   pla                     ; param in A
+006108  2  AC 60 60             ldy     mouse_op        ; $n0 in Y
 00610B  2               
-00610B  2  68                   pla                     ; param in A
-00610C  2  AC 64 60             ldy     mouse_op        ; $n0 in Y
-00610F  2               
-00610F  2  08                   php
-006110  2  78                   sei
-006111  2  20 16 61             jsr     call
-006114  2  28                   plp
-006115  2  60                   rts
-006116  2               
-006116  2  6C EB 00     call:   jmp     (mouse_ptr)
-006119  2               .endproc
-006119  2               
-006119  2               ;;;--------------------------------------------------
-006119  2               ;;; Read mouse pos, send deltas, and recenter
-006119  2               
-006119  2               .proc SendMouse
-006119  2  48 8A 48 98          SaveRegisters
-00611D  2  48           
-00611E  2  AD 62 60             lda     mouse_slot
-006121  2  F0 5E                beq     done
-006123  2               
-006123  2  A4 14 4C FD          MOUSE_CALL ReadMouse
-006127  2  60           
-006128  2               
-006128  2  A5 30                lda     Protocol::MouseX
-00612A  2  20 30 60             jsr     SSC::Put
-00612D  2  A9 01                lda     #1              ; Data size
-00612F  2  20 30 60             jsr     SSC::Put
-006132  2  AE 62 60             ldx     mouse_slot
-006135  2  BD 78 04             lda     MOUSE_X_LSB,x
-006138  2  05 0F                ora     MOUSE_POS_MASK
-00613A  2  20 30 60             jsr     SSC::Put
-00613D  2               
-00613D  2  A5 31                lda     Protocol::MouseY
-00613F  2  20 30 60             jsr     SSC::Put
-006142  2  A9 01                lda     #1              ; Data size
-006144  2  20 30 60             jsr     SSC::Put
-006147  2  AE 62 60             ldx     mouse_slot
-00614A  2  BD F8 04             lda     MOUSE_Y_LSB,x
-00614D  2  05 0F                ora     MOUSE_POS_MASK
-00614F  2  20 30 60             jsr     SSC::Put
-006152  2               
-006152  2  A5 32                lda     Protocol::MouseBtn
-006154  2  20 30 60             jsr     SSC::Put
-006157  2  A9 01                lda     #1              ; Data size
-006159  2  20 30 60             jsr     SSC::Put
-00615C  2  AE 62 60             ldx     mouse_slot
-00615F  2  BD 78 07             lda     MOUSE_STATUS,x
-006162  2  20 30 60             jsr     SSC::Put
-006165  2               
-006165  2  AE 62 60 A9          DoPosMouse MOUSE_CENTER, MOUSE_CENTER
-006169  2  17 9D 78 04  
-00616D  2  A9 00 9D 78  
-006171  2  05 A9 17 9D  
-006175  2  F8 04 A9 00  
-006179  2  9D F8 05 A4  
-00617D  2  16 4C FD 60  
-006181  2               
-006181  2  68 A8 68 AA  done:   RestoreRegisters
-006185  2  68           
-006186  2  60                   rts
-006187  2               .endproc
-006187  2               
-006187  2               .endproc
-006187  2               
-006187  1                   .endif
-006187  1               
-006187  1               
-006187  1               ;;;-------------------------------------------------------------------
-006187  1               ;;; Variables
-006187  1               ;;;-------------------------------------------------------------------
-006187  1               
-006187  1               ;;; Application configuration
-006187  1  03           PSPEED: .byte   SSC::BPS_115k   ; Hardcoded for Apple IIc (TODO: Allow configuration)
-006188  1  02           PSLOT:  .byte   2               ; Hardcoded for Apple IIc (TODO: Allow configuration)
-006189  1  00           PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemented)
-00618A  1               
-00618A  1               
-00618A  1               ;;;---------------------------------------------------------
-00618A  1               ;;; Initialize the application, and enter the main loop
-00618A  1               
-00618A  1               .proc AppEntry
-00618A  1  AD 88 61             lda     PSLOT           ; Use slot 2
-00618D  1  20 07 60             jsr     SSC::Init       ; Initialize Super Serial Card
-006190  1  20 75 62             jsr     InitHires       ; Initialize Hi-Res graphics
-006193  1  20 D4 61             jsr     InitInput       ; Initialize input devices
-006196  1  20 A3 61             jsr     MainLoop
-006199  1                       ;; fall through
-006199  1               .endproc
-006199  1               
-006199  1               ;;;---------------------------------------------------------
-006199  1               ;;; Clean up and exit app
-006199  1               
-006199  1               .proc AppExit
-006199  1  20 54 60             jsr     SSC::Reset
-00619C  1  8D 54 C0             sta     LOWSCR
-00619F  1  8D 51 C0             sta     TXTSET
-0061A2  1  60                   rts
-0061A3  1               .endproc
-0061A3  1               
-0061A3  1               ;;;-------------------------------------------------------------------
-0061A3  1               ;;;
-0061A3  1               ;;; Main loop functionality
-0061A3  1               ;;;
-0061A3  1               ;;;-------------------------------------------------------------------
-0061A3  1               
-0061A3  1               
-0061A3  1               ;;;---------------------------------------------------------
-0061A3  1               .proc MainLoop
-0061A3  1               
-0061A3  1               ;;; TODO: Sort out the protocol - should be able to send
-0061A3  1               ;;; input state without receiving data
-0061A3  1               ;;;    jsr SSC::HasData      ; Anything to read?
-0061A3  1               ;;;    bne :+              ; Nope
-0061A3  1               
-0061A3  1  20 AD 61     :       jsr     ReceivePage
-0061A6  1                       ;; Input is sent every 256 bytes (32 times per page)
-0061A6  1  20 8C 62             jsr     FlipHires
+00610B  2  08                   php
+00610C  2  78                   sei
+00610D  2  20 12 61             jsr     call
+006110  2  28                   plp
+006111  2  60                   rts
+006112  2               
+006112  2  6C EB 00     call:   jmp     (mouse_ptr)
+006115  2               .endproc
+006115  2               
+006115  2               ;;;--------------------------------------------------
+006115  2               ;;; Read mouse pos, send deltas, and recenter
+006115  2               
+006115  2               .proc SendMouse
+006115  2  48 8A 48 98          SaveRegisters
+006119  2  48           
+00611A  2  AD 5E 60             lda     mouse_slot
+00611D  2  F0 5E                beq     done
+00611F  2               
+00611F  2  A4 14 4C F9          MOUSE_CALL ReadMouse
+006123  2  60           
+006124  2               
+006124  2  A5 30                lda     Protocol::MouseX
+006126  2  20 30 60             jsr     SSC::Put
+006129  2  A9 01                lda     #1              ; Data size
+00612B  2  20 30 60             jsr     SSC::Put
+00612E  2  AE 5E 60             ldx     mouse_slot
+006131  2  BD 78 04             lda     MOUSE_X_LSB,x
+006134  2  05 0F                ora     MOUSE_POS_MASK
+006136  2  20 30 60             jsr     SSC::Put
+006139  2               
+006139  2  A5 31                lda     Protocol::MouseY
+00613B  2  20 30 60             jsr     SSC::Put
+00613E  2  A9 01                lda     #1              ; Data size
+006140  2  20 30 60             jsr     SSC::Put
+006143  2  AE 5E 60             ldx     mouse_slot
+006146  2  BD F8 04             lda     MOUSE_Y_LSB,x
+006149  2  05 0F                ora     MOUSE_POS_MASK
+00614B  2  20 30 60             jsr     SSC::Put
+00614E  2               
+00614E  2  A5 32                lda     Protocol::MouseBtn
+006150  2  20 30 60             jsr     SSC::Put
+006153  2  A9 01                lda     #1              ; Data size
+006155  2  20 30 60             jsr     SSC::Put
+006158  2  AE 5E 60             ldx     mouse_slot
+00615B  2  BD 78 07             lda     MOUSE_STATUS,x
+00615E  2  20 30 60             jsr     SSC::Put
+006161  2               
+006161  2  AE 5E 60 A9          DoPosMouse MOUSE_CENTER, MOUSE_CENTER
+006165  2  17 9D 78 04  
+006169  2  A9 00 9D 78  
+00616D  2  05 A9 17 9D  
+006171  2  F8 04 A9 00  
+006175  2  9D F8 05 A4  
+006179  2  16 4C F9 60  
+00617D  2               
+00617D  2  68 A8 68 AA  done:   RestoreRegisters
+006181  2  68           
+006182  2  60                   rts
+006183  2               .endproc
+006183  2               
+006183  2               .endproc
+006183  2               
+006183  1                   .endif
+006183  1               
+006183  1               
+006183  1               ;;;-------------------------------------------------------------------
+006183  1               ;;; Variables
+006183  1               ;;;-------------------------------------------------------------------
+006183  1               
+006183  1               ;;; Application configuration
+006183  1  03           PSPEED: .byte   SSC::BPS_115k   ; Hardcoded for Apple IIc (TODO: Allow configuration)
+006184  1  02           PSLOT:  .byte   2               ; Hardcoded for Apple IIc (TODO: Allow configuration)
+006185  1  00           PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemented)
+006186  1               
+006186  1               
+006186  1               ;;;---------------------------------------------------------
+006186  1               ;;; Initialize the application, and enter the main loop
+006186  1               
+006186  1               .proc AppEntry
+006186  1  AD 84 61             lda     PSLOT           ; Use slot 2
+006189  1  20 07 60             jsr     SSC::Init       ; Initialize Super Serial Card
+00618C  1  20 64 62             jsr     InitHires       ; Initialize Hi-Res graphics
+00618F  1  20 C3 61             jsr     InitInput       ; Initialize input devices
+006192  1  20 9F 61             jsr     MainLoop
+006195  1                       ;; fall through
+006195  1               .endproc
+006195  1               
+006195  1               ;;;---------------------------------------------------------
+006195  1               ;;; Clean up and exit app
+006195  1               
+006195  1               .proc AppExit
+006195  1  20 50 60             jsr     SSC::Reset
+006198  1  8D 54 C0             sta     LOWSCR
+00619B  1  8D 51 C0             sta     TXTSET
+00619E  1  60                   rts
+00619F  1               .endproc
+00619F  1               
+00619F  1               ;;;-------------------------------------------------------------------
+00619F  1               ;;;
+00619F  1               ;;; Main loop functionality
+00619F  1               ;;;
+00619F  1               ;;;-------------------------------------------------------------------
+00619F  1               
+00619F  1               
+00619F  1               ;;;---------------------------------------------------------
+00619F  1               .proc MainLoop
+00619F  1               
+00619F  1               ;;; TODO: Sort out the protocol - should be able to send
+00619F  1               ;;; input state without receiving data
+00619F  1               ;;;    jsr SSC::HasData      ; Anything to read?
+00619F  1               ;;;    bne :+              ; Nope
+00619F  1               
+00619F  1  20 A9 61     :       jsr     ReceivePage
+0061A2  1  20 7C 62             jsr     FlipHires
+0061A5  1               
+0061A5  1  4C 9F 61             jmp     :-              ; TODO: define an exit trigger
+0061A8  1  60                   rts
+0061A9  1               .endproc
 0061A9  1               
-0061A9  1  4C A3 61             jmp     :-              ; TODO: define an exit trigger
-0061AC  1  60                   rts
-0061AD  1               .endproc
-0061AD  1               
-0061AD  1               
-0061AD  1               ;;;---------------------------------------------------------
-0061AD  1               ;;; Request a hires page, sending input state along every
-0061AD  1               ;;; 256 bytes.
-0061AD  1               ;;;
-0061AD  1               
-0061AD  1               .proc ReceivePage
-0061AD  1               
-0061AD  1               ptr     := $FA
-0061AD  1               
-0061AD  1  A9 80                lda     #Protocol::Screen
-0061AF  1  20 30 60             jsr     SSC::Put
-0061B2  1  A9 00                lda     #0              ; data size
-0061B4  1  20 30 60             jsr     SSC::Put
-0061B7  1               
-0061B7  1               
-0061B7  1  A9 00                lda     #0              ; set up write pointer
-0061B9  1  85 FA                sta     ptr
-0061BB  1  A5 E6                lda     PAGE
-0061BD  1  85 FB                sta     ptr+1
-0061BF  1  A2 20                ldx     #PAGESIZE       ; plan to receive this many pages
-0061C1  1  A0 00                ldy     #0
+0061A9  1               
+0061A9  1               ;;;---------------------------------------------------------
+0061A9  1               ;;; Request a hires page, sending input state along every
+0061A9  1               ;;; 256 bytes.
+0061A9  1               ;;;
+0061A9  1               
+0061A9  1               .proc ReceivePage
+0061A9  1               
+0061A9  1               ptr     := $FA
+0061A9  1               
+0061A9  1               .if 0
+0061A9  1                       lda     #Protocol::Screen
+0061A9  1                       jsr     SSC::Put
+0061A9  1                       lda     #0              ; data size
+0061A9  1                       jsr     SSC::Put
+0061A9  1               .endif
+0061A9  1               
+0061A9  1  A9 00                lda     #0              ; set up write pointer
+0061AB  1  85 FA                sta     ptr
+0061AD  1  A5 E6                lda     PAGE
+0061AF  1  85 FB                sta     ptr+1
+0061B1  1  A2 20                ldx     #PAGESIZE       ; plan to receive this many pages
+0061B3  1  A0 00                ldy     #0
+0061B5  1               
+0061B5  1  20 3D 60     :       jsr     SSC::Get
+0061B8  1  91 FA                sta     (ptr),Y
+0061BA  1               
+0061BA  1  C8                   iny
+0061BB  1  D0 F8                bne     :-              ; Do a full page...
+0061BD  1               
+0061BD  1                       ;; Interleave to maintain responsiveness
+0061BD  1               .if 0
+0061BD  1                       jsr     SendInputState
+0061BD  1               .endif
+0061BD  1               
+0061BD  1  E6 FB                inc     ptr+1
+0061BF  1  CA                   dex
+0061C0  1  D0 F3                bne     :-              ; ...as many pages as we need
+0061C2  1  60                   rts
+0061C3  1               .endproc
 0061C3  1               
-0061C3  1  20 3F 60     :       jsr     SSC::Get
-0061C6  1  91 FA                sta     (ptr),Y
-0061C8  1  C8                   iny
-0061C9  1  D0 F8                bne     :-              ; Do a full page...
-0061CB  1               
-0061CB  1                       ;; Interleave to maintain responsiveness
-0061CB  1  20 D8 61             jsr     SendInputState
-0061CE  1               
-0061CE  1  E6 FB                inc     ptr+1
-0061D0  1  CA                   dex
-0061D1  1  D0 F0                bne     :-              ; ...as many pages as we need
-0061D3  1  60                   rts
-0061D4  1               .endproc
+0061C3  1               
+0061C3  1               ;;;-------------------------------------------------------------------
+0061C3  1               ;;;
+0061C3  1               ;;; Input device routines
+0061C3  1               ;;;
+0061C3  1               ;;;-------------------------------------------------------------------
+0061C3  1               
+0061C3  1               ;;;---------------------------------------------------------
+0061C3  1               ;;; Initialize input devices and storage for detecting
+0061C3  1               ;;; state transitions
+0061C3  1               
+0061C3  1               .proc InitInput
+0061C3  1               
+0061C3  1                   .ifdef MOUSE_SUPPORT
+0061C3  1  20 61 60             jsr     Mouse::FindMouse
+0061C6  1                   .endif
+0061C6  1               
+0061C6  1  60                   rts
+0061C7  1               .endproc
+0061C7  1               
+0061C7  1               
+0061C7  1               ;;;---------------------------------------------------------
+0061C7  1               ;;; Send a full set of input state updates.
+0061C7  1               
+0061C7  1               ;;; Assumes time to transmit is roughly comparable to time
+0061C7  1               ;;; to measure input state, therefore only sending changes is
+0061C7  1               ;;; not worthwhile in most cases.
+0061C7  1               
+0061C7  1               .proc SendInputState
+0061C7  1  20 D4 61             jsr     MaybeSendKeyboard
+0061CA  1  20 07 62             jsr     SendButtons
+0061CD  1               
+0061CD  1                   .ifdef PADDLE_SUPPORT
+0061CD  1  20 28 62             jsr     SendPaddles
+0061D0  1                   .endif
+0061D0  1               
+0061D0  1                   .ifdef MOUSE_SUPPORT
+0061D0  1  20 15 61             jsr     Mouse::SendMouse
+0061D3  1                   .endif
+0061D3  1               
+0061D3  1               .endproc
+0061D3  1               
+0061D3  1               
+0061D3  1               ;;;------------------------------------------------------------
+0061D3  1               ;;; Keyboard
+0061D3  1               
+0061D3  1               ;;; NOTE: Can't use KBDSTRB to detect key up -> key down transition
+0061D3  1               ;;; since the msb can change before the key code. Instead, consider
+0061D3  1               ;;; these cases:
+0061D3  1               ;;;
+0061D3  1               ;;;  OLD STATE    KBD       KBDSTRB    RESULT
+0061D3  1               ;;;   Up           Up        -          No-op
+0061D3  1               ;;;   Up           Down      -          Save and send key down
+0061D3  1               ;;;   Down         -         Up         Save and send key up
+0061D3  1               ;;;   Down         -         Down       Save and send key ONLY if different
+0061D3  1               ;;;
+0061D3  1               
+0061D3  1  00           last_kb:        .byte   0
 0061D4  1               
-0061D4  1               
-0061D4  1               ;;;-------------------------------------------------------------------
-0061D4  1               ;;;
-0061D4  1               ;;; Input device routines
-0061D4  1               ;;;
-0061D4  1               ;;;-------------------------------------------------------------------
-0061D4  1               
-0061D4  1               ;;;---------------------------------------------------------
-0061D4  1               ;;; Initialize input devices and storage for detecting
-0061D4  1               ;;; state transitions
-0061D4  1               
-0061D4  1               .proc InitInput
-0061D4  1               
-0061D4  1                   .ifdef MOUSE_SUPPORT
-0061D4  1  20 65 60             jsr     Mouse::FindMouse
-0061D7  1                   .endif
-0061D7  1               
-0061D7  1  60                   rts
-0061D8  1               .endproc
-0061D8  1               
-0061D8  1               
-0061D8  1               ;;;---------------------------------------------------------
-0061D8  1               ;;; Send a full set of input state updates.
-0061D8  1               
-0061D8  1               ;;; Assumes time to transmit is roughly comparable to time
-0061D8  1               ;;; to measure input state, therefore only sending changes is
-0061D8  1               ;;; not worthwhile in most cases.
-0061D8  1               
-0061D8  1               .proc SendInputState
-0061D8  1  20 E5 61             jsr     MaybeSendKeyboard
-0061DB  1  20 18 62             jsr     SendButtons
-0061DE  1               
-0061DE  1                   .ifdef PADDLE_SUPPORT
-0061DE  1  20 39 62             jsr     SendPaddles
-0061E1  1                   .endif
+0061D4  1               .proc MaybeSendKeyboard
+0061D4  1  AD D3 61             lda     last_kb
+0061D7  1  D0 08                bne     key_was_down
+0061D9  1               
+0061D9  1               key_was_up:
+0061D9  1                       ;; Key was up - send only if now down.
+0061D9  1  AD 00 C0             lda     KBD             ; Read keyboard
+0061DC  1  10 28                bpl     done            ; Do nothing if it is still up.
+0061DE  1  4C F3 61             jmp     send            ; Otherwise send.
 0061E1  1               
-0061E1  1                   .ifdef MOUSE_SUPPORT
-0061E1  1  20 19 61             jsr     Mouse::SendMouse
-0061E4  1                   .endif
-0061E4  1               
-0061E4  1               .endproc
-0061E4  1               
-0061E4  1               
-0061E4  1               ;;;------------------------------------------------------------
-0061E4  1               ;;; Keyboard
-0061E4  1               
-0061E4  1               ;;; NOTE: Can't use KBDSTRB to detect key up -> key down transition
-0061E4  1               ;;; since the msb can change before the key code. Instead, consider
-0061E4  1               ;;; these cases:
-0061E4  1               ;;;
-0061E4  1               ;;;  OLD STATE    KBD       KBDSTRB    RESULT
-0061E4  1               ;;;   Up           Up        -          No-op
-0061E4  1               ;;;   Up           Down      -          Save and send key down
-0061E4  1               ;;;   Down         -         Up         Save and send key up
-0061E4  1               ;;;   Down         -         Down       Save and send key ONLY if different
-0061E4  1               ;;;
-0061E4  1               
-0061E4  1  00           last_kb:        .byte   0
-0061E5  1               
-0061E5  1               .proc MaybeSendKeyboard
-0061E5  1  AD E4 61             lda     last_kb
-0061E8  1  D0 08                bne     key_was_down
-0061EA  1               
-0061EA  1               key_was_up:
-0061EA  1                       ;; Key was up - send only if now down.
-0061EA  1  AD 00 C0             lda     KBD             ; Read keyboard
-0061ED  1  10 28                bpl     done            ; Do nothing if it is still up.
-0061EF  1  4C 04 62             jmp     send            ; Otherwise send.
-0061F2  1               
-0061F2  1               key_was_down:
-0061F2  1                       ;; Key was down - strobe should match
-0061F2  1                       ;; unless the key changed or was released.
-0061F2  1  AD 10 C0             lda     KBDSTRB
-0061F5  1  30 05                bmi     kbdstrb_down
-0061F7  1               
-0061F7  1               kbdstrb_up:
-0061F7  1  A9 00                lda     #0              ; Now released
-0061F9  1  4C 04 62             jmp     send
-0061FC  1               
-0061FC  1               kbdstrb_down:
-0061FC  1  CD E4 61             cmp     last_kb         ; Same key as last time?
-0061FF  1  F0 16                beq     done            ; - no change, don't send.
-006201  1  4C 04 62             jmp     send
-006204  1               
-006204  1  8D E4 61     send:   sta     last_kb
-006207  1  A5 00                lda     Protocol::Keyboard
+0061E1  1               key_was_down:
+0061E1  1                       ;; Key was down - strobe should match
+0061E1  1                       ;; unless the key changed or was released.
+0061E1  1  AD 10 C0             lda     KBDSTRB
+0061E4  1  30 05                bmi     kbdstrb_down
+0061E6  1               
+0061E6  1               kbdstrb_up:
+0061E6  1  A9 00                lda     #0              ; Now released
+0061E8  1  4C F3 61             jmp     send
+0061EB  1               
+0061EB  1               kbdstrb_down:
+0061EB  1  CD D3 61             cmp     last_kb         ; Same key as last time?
+0061EE  1  F0 16                beq     done            ; - no change, don't send.
+0061F0  1  4C F3 61             jmp     send
+0061F3  1               
+0061F3  1  8D D3 61     send:   sta     last_kb
+0061F6  1  A5 00                lda     Protocol::Keyboard
+0061F8  1  20 30 60             jsr     SSC::Put
+0061FB  1  A9 01                lda     #1              ; Data size
+0061FD  1  20 30 60             jsr     SSC::Put
+006200  1  AD D3 61             lda     last_kb
+006203  1  20 30 60             jsr     SSC::Put
+006206  1               
+006206  1  60           done:   rts
+006207  1               .endproc
+006207  1               
+006207  1               ;;;------------------------------------------------------------
+006207  1               ;;; Buttons
+006207  1               
+006207  1               .proc SendButtons
+006207  1               
+006207  1  A5 10                lda     Protocol::Button0
 006209  1  20 30 60             jsr     SSC::Put
 00620C  1  A9 01                lda     #1              ; Data size
 00620E  1  20 30 60             jsr     SSC::Put
-006211  1  AD E4 61             lda     last_kb
+006211  1  AD 61 C0             lda     BUTN0
 006214  1  20 30 60             jsr     SSC::Put
 006217  1               
-006217  1  60           done:   rts
-006218  1               .endproc
-006218  1               
-006218  1               ;;;------------------------------------------------------------
-006218  1               ;;; Buttons
-006218  1               
-006218  1               .proc SendButtons
-006218  1               
-006218  1  A5 10                lda     Protocol::Button0
-00621A  1  20 30 60             jsr     SSC::Put
-00621D  1  A9 01                lda     #1              ; Data size
-00621F  1  20 30 60             jsr     SSC::Put
-006222  1  AD 61 C0             lda     BUTN0
-006225  1  20 30 60             jsr     SSC::Put
+006217  1  A5 11                lda     Protocol::Button1
+006219  1  20 30 60             jsr     SSC::Put
+00621C  1  A9 01                lda     #1              ; Data size
+00621E  1  20 30 60             jsr     SSC::Put
+006221  1  AD 62 C0             lda     BUTN1
+006224  1  20 30 60             jsr     SSC::Put
+006227  1               
+006227  1  60                   rts
+006228  1               .endproc
 006228  1               
-006228  1  A5 11                lda     Protocol::Button1
+006228  1               ;;;------------------------------------------------------------
+006228  1               ;;; Paddles
+006228  1               
+006228  1                   .ifdef PADDLE_SUPPORT
+006228  1               .proc SendPaddles
+006228  1               
+006228  1  A5 20                lda     Protocol::Paddle0
 00622A  1  20 30 60             jsr     SSC::Put
 00622D  1  A9 01                lda     #1              ; Data size
 00622F  1  20 30 60             jsr     SSC::Put
-006232  1  AD 62 C0             lda     BUTN1
-006235  1  20 30 60             jsr     SSC::Put
-006238  1               
-006238  1  60                   rts
-006239  1               .endproc
-006239  1               
-006239  1               ;;;------------------------------------------------------------
-006239  1               ;;; Paddles
-006239  1               
-006239  1                   .ifdef PADDLE_SUPPORT
-006239  1               .proc SendPaddles
-006239  1               
-006239  1  A5 20                lda     Protocol::Paddle0
-00623B  1  20 30 60             jsr     SSC::Put
-00623E  1  A9 01                lda     #1              ; Data size
-006240  1  20 30 60             jsr     SSC::Put
-006243  1               
-006243  1  A2 00                ldx     #0
-006245  1  20 60 62             jsr     pread
-006248  1  98                   tya
-006249  1  20 30 60             jsr     SSC::Put
-00624C  1               
-00624C  1                       ;; Need to wait 3ms between reads.
-00624C  1               
-00624C  1  A5 21                lda     Protocol::Paddle1
-00624E  1  20 30 60             jsr     SSC::Put
-006251  1  A9 01                lda     #1              ; Data size
-006253  1  20 30 60             jsr     SSC::Put
-006256  1               
-006256  1  A2 01                ldx     #1
-006258  1  20 60 62             jsr     pread
-00625B  1  98                   tya
-00625C  1  20 30 60             jsr     SSC::Put
-00625F  1               
-00625F  1  60                   rts
-006260  1               
-006260  1               .proc pread
-006260  1                       ;; Let any previous timer reset
-006260  1  BD 64 C0     :       lda     PADDL0,x
-006263  1  30 FB                bmi     :-
-006265  1               
-006265  1                       ;; Read paddle
-006265  1  AD 70 C0             lda     PTRIG
-006268  1  A0 00                ldy     #0
-00626A  1  EA                   nop
-00626B  1  EA                   nop
-00626C  1  BD 64 C0     :       lda     PADDL0,X
-00626F  1  10 03                bpl     done
-006271  1  C8                   iny
-006272  1  D0 F8                bne     :-
-006274  1  60           done:   rts
-006275  1               .endproc
-006275  1               
-006275  1               .endproc
-006275  1                   .endif
-006275  1               
-006275  1               ;;;-------------------------------------------------------------------
-006275  1               ;;;
-006275  1               ;;; Hi-res graphics routines
-006275  1               ;;;
-006275  1               ;;;-------------------------------------------------------------------
-006275  1               
-006275  1               ;;;---------------------------------------------------------
-006275  1               ;;; Set up the graphics display and pointers
-006275  1               
-006275  1               .proc InitHires
-006275  1  A9 20                lda     #PAGE1          ; clear page 1
-006277  1  85 E6                sta     PAGE
-006279  1  20 F2 F3             jsr     HCLR
+006232  1               
+006232  1  A2 00                ldx     #0
+006234  1  20 4F 62             jsr     pread
+006237  1  98                   tya
+006238  1  20 30 60             jsr     SSC::Put
+00623B  1               
+00623B  1                       ;; Need to wait 3ms between reads.
+00623B  1               
+00623B  1  A5 21                lda     Protocol::Paddle1
+00623D  1  20 30 60             jsr     SSC::Put
+006240  1  A9 01                lda     #1              ; Data size
+006242  1  20 30 60             jsr     SSC::Put
+006245  1               
+006245  1  A2 01                ldx     #1
+006247  1  20 4F 62             jsr     pread
+00624A  1  98                   tya
+00624B  1  20 30 60             jsr     SSC::Put
+00624E  1               
+00624E  1  60                   rts
+00624F  1               
+00624F  1               .proc pread
+00624F  1                       ;; Let any previous timer reset
+00624F  1  BD 64 C0     :       lda     PADDL0,x
+006252  1  30 FB                bmi     :-
+006254  1               
+006254  1                       ;; Read paddle
+006254  1  AD 70 C0             lda     PTRIG
+006257  1  A0 00                ldy     #0
+006259  1  EA                   nop
+00625A  1  EA                   nop
+00625B  1  BD 64 C0     :       lda     PADDL0,X
+00625E  1  10 03                bpl     done
+006260  1  C8                   iny
+006261  1  D0 F8                bne     :-
+006263  1  60           done:   rts
+006264  1               .endproc
+006264  1               
+006264  1               .endproc
+006264  1                   .endif
+006264  1               
+006264  1               ;;;-------------------------------------------------------------------
+006264  1               ;;;
+006264  1               ;;; Hi-res graphics routines
+006264  1               ;;;
+006264  1               ;;;-------------------------------------------------------------------
+006264  1               
+006264  1               ;;;---------------------------------------------------------
+006264  1               ;;; Set up the graphics display and pointers
+006264  1               
+006264  1               .proc InitHires
+006264  1  A9 20                lda     #PAGE1          ; clear page 1
+006266  1  85 E6                sta     PAGE
+006268  1  20 F2 F3             jsr     HCLR
+00626B  1               
+00626B  1                       ;; Show page 1
+00626B  1  8D 57 C0             sta     HIRES
+00626E  1  8D 50 C0             sta     TXTCLR
+006271  1  8D 52 C0             sta     MIXCLR
+006274  1  8D 54 C0             sta     LOWSCR
+006277  1               
+006277  1                       ;; And set up writing to page 2
+006277  1  A9 40                lda     #PAGE2
+006279  1  85 E6                sta     PAGE
+00627B  1               
+00627B  1  60                   rts
+00627C  1               .endproc
 00627C  1               
-00627C  1  20 8C 62             jsr     FlipHires       ; then show it and flip to 2
-00627F  1  8D 57 C0             sta     HIRES
-006282  1  8D 50 C0             sta     TXTCLR
-006285  1  8D 52 C0             sta     MIXCLR
-006288  1  8D 54 C0             sta     LOWSCR
-00628B  1               
-00628B  1  60                   rts
-00628C  1               .endproc
-00628C  1               
-00628C  1               
-00628C  1               ;;;---------------------------------------------------------
-00628C  1               ;;; Call when done with the current plotting page
-00628C  1               ;;; (selected in PAGE) and it will be shown and the
-00628C  1               ;;; other page will be shown.
-00628C  1               
-00628C  1               .proc FlipHires
-00628C  1  A5 E6                lda     PAGE            ; plotting on which page?
-00628E  1  C9 20                cmp     #PAGE1
-006290  1  F0 08                beq     :+
+00627C  1               
+00627C  1               ;;;---------------------------------------------------------
+00627C  1               ;;; Call when done with the current plotting page
+00627C  1               ;;; (selected in PAGE) and it will be shown and the
+00627C  1               ;;; other page will be shown.
+00627C  1               
+00627C  1               .proc FlipHires
+00627C  1  A5 E6                lda     PAGE            ; plotting on which page?
+00627E  1  C9 20                cmp     #PAGE1
+006280  1  F0 08                beq     :+
+006282  1               
+006282  1  8D 55 C0             sta     HISCR           ; page 2 - so show it
+006285  1  A9 20                lda     #PAGE1          ; and plot on page 1
+006287  1  85 E6                sta     PAGE
+006289  1  60                   rts
+00628A  1               
+00628A  1  8D 54 C0     :       sta     LOWSCR          ; page 1 - so show it
+00628D  1  A9 40                lda     #PAGE2          ; and plot on page 2
+00628F  1  85 E6                sta     PAGE
+006291  1  60                   rts
+006292  1               .endproc
 006292  1               
-006292  1  8D 55 C0             sta     HISCR           ; page 2 - so show it
-006295  1  A9 20                lda     #PAGE1          ; and plot on page 1
-006297  1  85 E6                sta     PAGE
-006299  1  60                   rts
-00629A  1               
-00629A  1  8D 54 C0     :       sta     LOWSCR          ; page 1 - so show it
-00629D  1  A9 40                lda     #PAGE2          ; and plot on page 2
-00629F  1  85 E6                sta     PAGE
-0062A1  1  60                   rts
-0062A2  1               .endproc
-0062A2  1               

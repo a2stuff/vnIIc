@@ -27,7 +27,12 @@ $('#dither').addEventListener('input', e => {
   dither_factor = (input.value - input.min) / (input.max - input.min);
 });
 
+// Holds last convert result
 let hires_buffer = new Uint8Array(8192);
+let dirty = true;
+
+// Used during conversion
+let convert_buffer = new Uint8Array(8192);
 
 // Save the last captured frame as a hires image file.
 $('#save').addEventListener('click', e => {
@@ -69,7 +74,9 @@ $('#start').addEventListener('click', async e => {
       const imagedata = ctx.getImageData(0, 0, can.width, can.height);
 
       quantize(imagedata, indexes);
-      convert_to_hires(indexes, hires_buffer);
+      convert_to_hires(indexes, convert_buffer);
+      hires_buffer.set(convert_buffer);
+      dirty = true;
 
       qctx.putImageData(imagedata, 0, 0);
 
@@ -293,7 +300,24 @@ function convert_to_hires(indexes, buffer) {
 
 let port;
 
+function sleep(ms) {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 $('#bootstrap').addEventListener('click', async e => {
+
+  port = await getSerialPort();
+
+  // Initial connection for bootstrapping
+  await port.open({
+    baudrate: 9600,
+    databits: 8,
+    parity: "none",
+    stopbits: 1,
+    rtscts: true
+  });
 
   alert('On the Apple II, type:\n\n' +
         '  IN#2                 (then press Return)\n' +
@@ -303,11 +327,14 @@ $('#bootstrap').addEventListener('click', async e => {
   const CLIENT_ADDR = 0x6000;
   const CLIENT_FILE = 'client/client.bin';
 
-  port = getSerialPort();
+  async function send(string) {
+    await port.write(string + '\r');
+    await sleep(100);
+  }
 
-  await port.write('CALL -151'); // Enter Monitor
+  await send('CALL -151'); // Enter Monitor
 
-  const response = await fetch(CLIENT_FILE);
+  const response = await fetch(CLIENT_FILE, {cache: 'no-cache'});
   if (!response.ok)
     throw new Error(response.statusText);
   const bytes = new Uint8Array(await response.arrayBuffer());
@@ -317,46 +344,79 @@ $('#bootstrap').addEventListener('click', async e => {
             [...bytes.slice(offset, offset + 8)]
             .map(b => ('00' + b.toString(16).toUpperCase()).substr(-2))
             .join(' ');
+    addr += 8;
 
-    await port.write(str);
+    await send(str);
   }
 
-  await port.write('\x03'); // Ctrl+C - Exit Monitor
-  await port.write(`CALL ${CLIENT_ADDR}`); // Execute client
+  await send('\x03'); // Ctrl+C - Exit Monitor
+  await send(`CALL ${CLIENT_ADDR}`); // Execute client
 
+  // Bump connection to high speed
+  await port.close();
+  await port.open({
+    baudrate: 115200,
+    databits: 8,
+    parity: "none",
+    stopbits: 1,
+    rtscts: true
+  });
 
   const splash = await fetch('res/SPLASH.PIC.BIN');
   if (!splash.ok)
-    throw new Error(response.statusText);
-  await port.write(new Uint8Array(await splash.arrayBuffer()));
+    throw new Error(splash.statusText);
+  await sleep(200); // Allow for app startup
+  const img = await splash.arrayBuffer();
+  hires_buffer.set(img);
+  await port.write(img);
 });
 
 
 async function getSerialPort() {
 
-  const ports = await SerialPort.requestPorts();
-  if (!ports.length) throw new Error('No ports');
-  const port = new SerialPort(ports[0].path);
-
-  const reader = port.in.getReader();
-  const writer = port.out.getWriter();
-
-  // Generator yielding one byte at a time from |reader|.
-  const gen = (async function*() {
-    while (true) {
-      const {value, done} = await reader.read();
-      if (done) return;
-      for (const byte of value)
-        yield byte;
-    }
-  })();
+  const port = await navigator.serial.requestPort();
+  if (!port) throw new Error('No ports');
 
   return {
+    // Open port.
+    open: async (options) => {
+      await port.open(options);
+      if (!port.readable) throw new Error('Port not readable');
+      if (!port.writable) throw new Error('Port not writable');
+
+      this.reader = port.readable.getReader();
+      this.writer = port.writable.getWriter();
+
+      // Generator yielding one byte at a time from |reader|.
+      const reader = this.reader;
+      this.gen = (async function*() {
+        while (port.readable) {
+          const {value, done} = await reader.read();
+          if (done) return;
+          for (const byte of value)
+            yield byte;
+        }
+      })();
+
+    },
+
+    // Close port.
+    close: async () => {
+      if (this.reader) this.reader.cancel();
+      if (this.writer) this.writer.releaseLock();
+
+      this.reader = null;
+      this.writer = null;
+      this.gen = null;
+
+      await port.close();
+    },
+
     // Read N bytes from port, returns plain array.
-    read: async function read(n) {
+    read: async (n) => {
       if (n <= 0) throw new Error();
       const result = [];
-      for await (const byte of gen) {
+      for await (const byte of this.gen) {
         result.push(byte);
         if (--n === 0) break;
       }
@@ -364,13 +424,13 @@ async function getSerialPort() {
     },
 
     // Write Uint8Array of bytes to port.
-    write: async function(bytes) {
-      await writer.write(bytes);
-    },
+    write: async (bytes) => {
+      if (!port.writable) throw new Error('Port not writable');
+      if (typeof bytes === 'string') {
+        bytes = new TextEncoder().encode(bytes);
+      }
 
-    // Close port.
-    close: async function() {
-      await writer.close();
+      await this.writer.write(bytes);
     }
   };
 }
@@ -382,6 +442,17 @@ async function getSerialPort() {
 // ============================================================
 
 async function startStreaming() {
+
+  while (true) {
+    await sleep(500);
+    if (dirty) {
+      // Send a copy
+      let copy = new Uint8Array(hires_buffer);
+      dirty = false;
+
+      await port.write(copy);
+    }
+  }
 
   const state = {
     keyboard: 0,
@@ -422,7 +493,7 @@ async function startStreaming() {
     case 0x32: state.mousebtn = data[0]; break;
 
       // Screen
-    case 0x80: port.write(hires_buffer); break;
+    case 0x80: await port.write(hires_buffer); break;
 
     default:
       console.warn(`Unexpected protocol command: ${command}`);

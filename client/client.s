@@ -4,8 +4,8 @@
 ;;;
 ;;;-------------------------------------------------------------------
 
-        PADDLE_SUPPORT = 1
-        MOUSE_SUPPORT  = 1
+        PADDLE_SUPPORT = 0
+        MOUSE_SUPPORT  = 0
 
         .include "apple2.inc"
 
@@ -33,6 +33,7 @@ PTRIG   := $C070
 ;;;---------------------------------------------------------
 
 HCLR    := $F3F2                      ; Clear current hires screen to black
+
 
 ;;;---------------------------------------------------------
 ;;; Other
@@ -125,7 +126,6 @@ PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemente
 ;;;    bne :+              ; Nope
 
 :       jsr     ReceivePage
-        ;; Input is sent every 256 bytes (32 times per page)
         jsr     FlipHires
 
         jmp     :-              ; TODO: define an exit trigger
@@ -142,11 +142,12 @@ PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemente
 
 ptr     := $FA
 
+.if 0
         lda     #Protocol::Screen
         jsr     SSC::Put
         lda     #0              ; data size
         jsr     SSC::Put
-
+.endif
 
         lda     #0              ; set up write pointer
         sta     ptr
@@ -157,11 +158,14 @@ ptr     := $FA
 
 :       jsr     SSC::Get
         sta     (ptr),Y
+
         iny
         bne     :-              ; Do a full page...
 
         ;; Interleave to maintain responsiveness
+.if 0
         jsr     SendInputState
+.endif
 
         inc     ptr+1
         dex
@@ -350,11 +354,15 @@ done:   rts
         sta     PAGE
         jsr     HCLR
 
-        jsr     FlipHires       ; then show it and flip to 2
+        ;; Show page 1
         sta     HIRES
         sta     TXTCLR
         sta     MIXCLR
         sta     LOWSCR
+
+        ;; And set up writing to page 2
+        lda     #PAGE2
+        sta     PAGE
 
         rts
 .endproc

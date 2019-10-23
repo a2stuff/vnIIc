@@ -64,9 +64,8 @@ BPSCTRL:        .byte   $16,$1E,$1F,$10 ; 300, 9600, 19200, 115k (with 8 data bi
         pha                     ; Push A onto the stack
 MOD_UASTAT_1    := *+1
 :       lda     UASTAT          ; Check status bits
-        and     #$70
-        cmp     #$10
-        bne     :-              ; Output register is full, so loop
+        and     #$10
+        beq     :-              ; Output register is full, so loop
         pla
 MOD_UADATA_1    := *+1
         sta     UADATA          ; Put character
@@ -81,9 +80,8 @@ MOD_UADATA_1    := Put::MOD_UADATA_1
 .proc Get
 MOD_UASTAT_2    := *+1
         lda     UASTAT          ; Check status bits
-        and     #$68
-        cmp     #$8
-        bne     Get             ; Input register empty, loop
+        and     #$8
+        beq     Get             ; Input register empty, loop
 MOD_UADATA_2    := *+1
         lda     UADATA          ; Get character
         rts

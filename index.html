@@ -30,7 +30,28 @@ body.supports-getDisplayMedia #stream-support::before {
   content: "👍 supported!"
 }
 
+#progress {
+  position: absolute;
+  z-index: 100;
+  left: 0; top: 0; bottom: 0; right: 0;
+  opacity: 0.9;
+  background-color: black;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+#progress progress {
+  width: 75%;
+  height: 50px;
+}
+body:not(.show-progress) #progress { display: none; }
+
 </style>
+
+<div id=progress><progress id=prog min=0 max=100 value=50></progress></div>
 
 <div id=title>
 <h1>vn//c

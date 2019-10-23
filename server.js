@@ -322,6 +322,9 @@ $('#bootstrap').addEventListener('click', async e => {
         '  Ctrl+A 14B       (then press Return)\n\n' +
         'Then click OK');
 
+  $('#prog').value = 0;
+  document.body.classList.add('show-progress');
+
   const CLIENT_ADDR = 0x6000;
   const CLIENT_FILE = 'client/client.bin';
 
@@ -345,6 +348,7 @@ $('#bootstrap').addEventListener('click', async e => {
     addr += 8;
 
     await send(str);
+    $('#prog').value = offset / bytes.length * 100;
   }
 
   await send('\x03'); // Ctrl+C - Exit Monitor
@@ -366,7 +370,10 @@ $('#bootstrap').addEventListener('click', async e => {
   await sleep(200); // Allow for app startup
   const img = await splash.arrayBuffer();
   hires_buffer.set(img);
+  $('#prog').value = 100;
   await port.write(img);
+
+  document.body.classList.remove('show-progress');
 });
 
 
@@ -388,18 +395,11 @@ async function getSerialPort() {
       // Generator yielding one byte at a time from |reader|.
       const reader = this.reader;
       this.gen = (async function*() {
-        console.log('gen invoked');
         while (port.readable) {
-          console.log('readable');
           const {value, done} = await reader.read();
-          if (done) { console.log('gen done!');  return; }
-          console.log('read value: ', value);
           for (const byte of value) {
-            console.log('yielding: ' + byte);
             yield byte;
-            console.log('after yielding: ' + byte);
           }
-          console.log('done yielding chunk');
         }
       })();
     },
@@ -418,17 +418,13 @@ async function getSerialPort() {
 
     // Read N bytes from port, returns plain array.
     read: async (n) => {
-      console.log('called read: ' + n);
       if (n <= 0) throw new Error();
       const result = [];
-      console.log('gen is: ', this.gen);
       while (result.length < n) {
         const {value, done} = await gen.next();
         if (done) throw new Error('out of data');
-        console.log('read byte: ' + value);
         result.push(value);
       }
-      console.log('returning: ', result);
       return result;
     },
 
@@ -468,12 +464,10 @@ async function startStreaming() {
 
 
   while (true) {
-    console.log('ticking');
     const command = (await port.read(1))[0];
     const size = (await port.read(1))[0];
     const data = size ? await port.read(size) : [];
 
-    console.log(command, size, data);
     if (command === undefined) return;
 
     switch (command) {

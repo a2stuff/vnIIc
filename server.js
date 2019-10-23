@@ -29,7 +29,6 @@ $('#dither').addEventListener('input', e => {
 
 // Holds last convert result
 let hires_buffer = new Uint8Array(8192);
-let dirty = true;
 
 // Used during conversion
 let convert_buffer = new Uint8Array(8192);
@@ -76,7 +75,6 @@ $('#start').addEventListener('click', async e => {
       quantize(imagedata, indexes);
       convert_to_hires(indexes, convert_buffer);
       hires_buffer.set(convert_buffer);
-      dirty = true;
 
       qctx.putImageData(imagedata, 0, 0);
 
@@ -390,14 +388,20 @@ async function getSerialPort() {
       // Generator yielding one byte at a time from |reader|.
       const reader = this.reader;
       this.gen = (async function*() {
+        console.log('gen invoked');
         while (port.readable) {
+          console.log('readable');
           const {value, done} = await reader.read();
-          if (done) return;
-          for (const byte of value)
+          if (done) { console.log('gen done!');  return; }
+          console.log('read value: ', value);
+          for (const byte of value) {
+            console.log('yielding: ' + byte);
             yield byte;
+            console.log('after yielding: ' + byte);
+          }
+          console.log('done yielding chunk');
         }
       })();
-
     },
 
     // Close port.
@@ -414,12 +418,17 @@ async function getSerialPort() {
 
     // Read N bytes from port, returns plain array.
     read: async (n) => {
+      console.log('called read: ' + n);
       if (n <= 0) throw new Error();
       const result = [];
-      for await (const byte of this.gen) {
-        result.push(byte);
-        if (--n === 0) break;
+      console.log('gen is: ', this.gen);
+      while (result.length < n) {
+        const {value, done} = await gen.next();
+        if (done) throw new Error('out of data');
+        console.log('read byte: ' + value);
+        result.push(value);
       }
+      console.log('returning: ', result);
       return result;
     },
 
@@ -443,17 +452,6 @@ async function getSerialPort() {
 
 async function startStreaming() {
 
-  while (true) {
-    await sleep(500);
-    if (dirty) {
-      // Send a copy
-      let copy = new Uint8Array(hires_buffer);
-      dirty = false;
-
-      await port.write(copy);
-    }
-  }
-
   const state = {
     keyboard: 0,
 
@@ -470,9 +468,13 @@ async function startStreaming() {
 
 
   while (true) {
-    const command = await port.read(1)[0];
-    const size = await port.read(1)[0];
+    console.log('ticking');
+    const command = (await port.read(1))[0];
+    const size = (await port.read(1))[0];
     const data = size ? await port.read(size) : [];
+
+    console.log(command, size, data);
+    if (command === undefined) return;
 
     switch (command) {
 
@@ -493,7 +495,11 @@ async function startStreaming() {
     case 0x32: state.mousebtn = data[0]; break;
 
       // Screen
-    case 0x80: await port.write(hires_buffer); break;
+    case 0x80:
+      // Send a copy
+      let copy = new Uint8Array(hires_buffer);
+      await port.write(copy);
+      break;
 
     default:
       console.warn(`Unexpected protocol command: ${command}`);

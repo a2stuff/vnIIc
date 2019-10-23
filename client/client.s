@@ -120,12 +120,17 @@ PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemente
 ;;;---------------------------------------------------------
 .proc MainLoop
 
+        ;; Handle splash image - sent without preamble
+        jsr     ReceivePage
+        jsr     FlipHires
+
+
 ;;; TODO: Sort out the protocol - should be able to send
 ;;; input state without receiving data
 ;;;    jsr SSC::HasData      ; Anything to read?
 ;;;    bne :+              ; Nope
 
-:       jsr     ReceivePage
+:       jsr     RequestPage
         jsr     FlipHires
 
         jmp     :-              ; TODO: define an exit trigger
@@ -134,20 +139,45 @@ PEXIT:  .byte   0               ; Set when it's time to exit (Not Yet Implemente
 
 
 ;;;---------------------------------------------------------
-;;; Request a hires page, sending input state along every
-;;; 256 bytes.
+;;; Receive a hires page; no input sent.
 ;;;
 
 .proc ReceivePage
 
 ptr     := $FA
 
-.if 0
+        lda     #0              ; set up write pointer
+        sta     ptr
+        lda     PAGE
+        sta     ptr+1
+        ldx     #PAGESIZE       ; plan to receive this many pages
+        ldy     #0
+
+:       jsr     SSC::Get
+        sta     (ptr),Y
+
+        iny
+        bne     :-              ; Do a full page...
+
+        inc     ptr+1
+        dex
+        bne     :-              ; ...as many pages as we need
+        rts
+.endproc
+
+;;;---------------------------------------------------------
+;;; Request a hires page, sending input state along every
+;;; 256 bytes.
+;;;
+
+.proc RequestPage
+
+ptr     := $FA
+
         lda     #Protocol::Screen
         jsr     SSC::Put
         lda     #0              ; data size
         jsr     SSC::Put
-.endif
 
         lda     #0              ; set up write pointer
         sta     ptr

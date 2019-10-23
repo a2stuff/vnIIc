@@ -613,8 +613,8 @@ Current file: client.s
 006186  1               .proc AppEntry
 006186  1  AD 84 61             lda     PSLOT           ; Use slot 2
 006189  1  20 07 60             jsr     SSC::Init       ; Initialize Super Serial Card
-00618C  1  20 64 62             jsr     InitHires       ; Initialize Hi-Res graphics
-00618F  1  20 C3 61             jsr     InitInput       ; Initialize input devices
+00618C  1  20 8E 62             jsr     InitHires       ; Initialize Hi-Res graphics
+00618F  1  20 ED 61             jsr     InitInput       ; Initialize input devices
 006192  1  20 9F 61             jsr     MainLoop
 006195  1                       ;; fall through
 006195  1               .endproc
@@ -639,272 +639,302 @@ Current file: client.s
 00619F  1               ;;;---------------------------------------------------------
 00619F  1               .proc MainLoop
 00619F  1               
-00619F  1               ;;; TODO: Sort out the protocol - should be able to send
-00619F  1               ;;; input state without receiving data
-00619F  1               ;;;    jsr SSC::HasData      ; Anything to read?
-00619F  1               ;;;    bne :+              ; Nope
-00619F  1               
-00619F  1  20 A9 61     :       jsr     ReceivePage
-0061A2  1  20 7C 62             jsr     FlipHires
+00619F  1                       ;; Handle splash image - sent without preamble
+00619F  1  20 AF 61             jsr     ReceivePage
+0061A2  1  20 A6 62             jsr     FlipHires
 0061A5  1               
-0061A5  1  4C 9F 61             jmp     :-              ; TODO: define an exit trigger
-0061A8  1  60                   rts
-0061A9  1               .endproc
-0061A9  1               
-0061A9  1               
-0061A9  1               ;;;---------------------------------------------------------
-0061A9  1               ;;; Request a hires page, sending input state along every
-0061A9  1               ;;; 256 bytes.
-0061A9  1               ;;;
-0061A9  1               
-0061A9  1               .proc ReceivePage
-0061A9  1               
-0061A9  1               ptr     := $FA
-0061A9  1               
-0061A9  1               .if 0
-0061A9  1                       lda     #Protocol::Screen
-0061A9  1                       jsr     SSC::Put
-0061A9  1                       lda     #0              ; data size
-0061A9  1                       jsr     SSC::Put
-0061A9  1               .endif
-0061A9  1               
-0061A9  1  A9 00                lda     #0              ; set up write pointer
-0061AB  1  85 FA                sta     ptr
-0061AD  1  A5 E6                lda     PAGE
-0061AF  1  85 FB                sta     ptr+1
-0061B1  1  A2 20                ldx     #PAGESIZE       ; plan to receive this many pages
-0061B3  1  A0 00                ldy     #0
-0061B5  1               
-0061B5  1  20 3D 60     :       jsr     SSC::Get
-0061B8  1  91 FA                sta     (ptr),Y
-0061BA  1               
-0061BA  1  C8                   iny
-0061BB  1  D0 F8                bne     :-              ; Do a full page...
-0061BD  1               
-0061BD  1                       ;; Interleave to maintain responsiveness
-0061BD  1               .if 0
-0061BD  1                       jsr     SendInputState
-0061BD  1               .endif
-0061BD  1               
-0061BD  1  E6 FB                inc     ptr+1
-0061BF  1  CA                   dex
-0061C0  1  D0 F3                bne     :-              ; ...as many pages as we need
-0061C2  1  60                   rts
-0061C3  1               .endproc
+0061A5  1               
+0061A5  1               ;;; TODO: Sort out the protocol - should be able to send
+0061A5  1               ;;; input state without receiving data
+0061A5  1               ;;;    jsr SSC::HasData      ; Anything to read?
+0061A5  1               ;;;    bne :+              ; Nope
+0061A5  1               
+0061A5  1  20 C9 61     :       jsr     RequestPage
+0061A8  1  20 A6 62             jsr     FlipHires
+0061AB  1               
+0061AB  1  4C A5 61             jmp     :-              ; TODO: define an exit trigger
+0061AE  1  60                   rts
+0061AF  1               .endproc
+0061AF  1               
+0061AF  1               
+0061AF  1               ;;;---------------------------------------------------------
+0061AF  1               ;;; Receive a hires page; no input sent.
+0061AF  1               ;;;
+0061AF  1               
+0061AF  1               .proc ReceivePage
+0061AF  1               
+0061AF  1               ptr     := $FA
+0061AF  1               
+0061AF  1  A9 00                lda     #0              ; set up write pointer
+0061B1  1  85 FA                sta     ptr
+0061B3  1  A5 E6                lda     PAGE
+0061B5  1  85 FB                sta     ptr+1
+0061B7  1  A2 20                ldx     #PAGESIZE       ; plan to receive this many pages
+0061B9  1  A0 00                ldy     #0
+0061BB  1               
+0061BB  1  20 3D 60     :       jsr     SSC::Get
+0061BE  1  91 FA                sta     (ptr),Y
+0061C0  1               
+0061C0  1  C8                   iny
+0061C1  1  D0 F8                bne     :-              ; Do a full page...
 0061C3  1               
-0061C3  1               
-0061C3  1               ;;;-------------------------------------------------------------------
-0061C3  1               ;;;
-0061C3  1               ;;; Input device routines
-0061C3  1               ;;;
-0061C3  1               ;;;-------------------------------------------------------------------
-0061C3  1               
-0061C3  1               ;;;---------------------------------------------------------
-0061C3  1               ;;; Initialize input devices and storage for detecting
-0061C3  1               ;;; state transitions
-0061C3  1               
-0061C3  1               .proc InitInput
-0061C3  1               
-0061C3  1                   .ifdef MOUSE_SUPPORT
-0061C3  1  20 61 60             jsr     Mouse::FindMouse
-0061C6  1                   .endif
-0061C6  1               
-0061C6  1  60                   rts
-0061C7  1               .endproc
-0061C7  1               
-0061C7  1               
-0061C7  1               ;;;---------------------------------------------------------
-0061C7  1               ;;; Send a full set of input state updates.
-0061C7  1               
-0061C7  1               ;;; Assumes time to transmit is roughly comparable to time
-0061C7  1               ;;; to measure input state, therefore only sending changes is
-0061C7  1               ;;; not worthwhile in most cases.
-0061C7  1               
-0061C7  1               .proc SendInputState
-0061C7  1  20 D4 61             jsr     MaybeSendKeyboard
-0061CA  1  20 07 62             jsr     SendButtons
-0061CD  1               
-0061CD  1                   .ifdef PADDLE_SUPPORT
-0061CD  1  20 28 62             jsr     SendPaddles
-0061D0  1                   .endif
-0061D0  1               
-0061D0  1                   .ifdef MOUSE_SUPPORT
-0061D0  1  20 15 61             jsr     Mouse::SendMouse
-0061D3  1                   .endif
+0061C3  1  E6 FB                inc     ptr+1
+0061C5  1  CA                   dex
+0061C6  1  D0 F3                bne     :-              ; ...as many pages as we need
+0061C8  1  60                   rts
+0061C9  1               .endproc
+0061C9  1               
+0061C9  1               ;;;---------------------------------------------------------
+0061C9  1               ;;; Request a hires page, sending input state along every
+0061C9  1               ;;; 256 bytes.
+0061C9  1               ;;;
+0061C9  1               
+0061C9  1               .proc RequestPage
+0061C9  1               
+0061C9  1               ptr     := $FA
+0061C9  1               
+0061C9  1  A9 80                lda     #Protocol::Screen
+0061CB  1  20 30 60             jsr     SSC::Put
+0061CE  1  A9 00                lda     #0              ; data size
+0061D0  1  20 30 60             jsr     SSC::Put
 0061D3  1               
-0061D3  1               .endproc
-0061D3  1               
-0061D3  1               
-0061D3  1               ;;;------------------------------------------------------------
-0061D3  1               ;;; Keyboard
-0061D3  1               
-0061D3  1               ;;; NOTE: Can't use KBDSTRB to detect key up -> key down transition
-0061D3  1               ;;; since the msb can change before the key code. Instead, consider
-0061D3  1               ;;; these cases:
-0061D3  1               ;;;
-0061D3  1               ;;;  OLD STATE    KBD       KBDSTRB    RESULT
-0061D3  1               ;;;   Up           Up        -          No-op
-0061D3  1               ;;;   Up           Down      -          Save and send key down
-0061D3  1               ;;;   Down         -         Up         Save and send key up
-0061D3  1               ;;;   Down         -         Down       Save and send key ONLY if different
-0061D3  1               ;;;
-0061D3  1               
-0061D3  1  00           last_kb:        .byte   0
-0061D4  1               
-0061D4  1               .proc MaybeSendKeyboard
-0061D4  1  AD D3 61             lda     last_kb
-0061D7  1  D0 08                bne     key_was_down
-0061D9  1               
-0061D9  1               key_was_up:
-0061D9  1                       ;; Key was up - send only if now down.
-0061D9  1  AD 00 C0             lda     KBD             ; Read keyboard
-0061DC  1  10 28                bpl     done            ; Do nothing if it is still up.
-0061DE  1  4C F3 61             jmp     send            ; Otherwise send.
-0061E1  1               
-0061E1  1               key_was_down:
-0061E1  1                       ;; Key was down - strobe should match
-0061E1  1                       ;; unless the key changed or was released.
-0061E1  1  AD 10 C0             lda     KBDSTRB
-0061E4  1  30 05                bmi     kbdstrb_down
-0061E6  1               
-0061E6  1               kbdstrb_up:
-0061E6  1  A9 00                lda     #0              ; Now released
-0061E8  1  4C F3 61             jmp     send
-0061EB  1               
-0061EB  1               kbdstrb_down:
-0061EB  1  CD D3 61             cmp     last_kb         ; Same key as last time?
-0061EE  1  F0 16                beq     done            ; - no change, don't send.
-0061F0  1  4C F3 61             jmp     send
-0061F3  1               
-0061F3  1  8D D3 61     send:   sta     last_kb
-0061F6  1  A5 00                lda     Protocol::Keyboard
-0061F8  1  20 30 60             jsr     SSC::Put
-0061FB  1  A9 01                lda     #1              ; Data size
-0061FD  1  20 30 60             jsr     SSC::Put
-006200  1  AD D3 61             lda     last_kb
-006203  1  20 30 60             jsr     SSC::Put
-006206  1               
-006206  1  60           done:   rts
-006207  1               .endproc
-006207  1               
-006207  1               ;;;------------------------------------------------------------
-006207  1               ;;; Buttons
-006207  1               
-006207  1               .proc SendButtons
-006207  1               
-006207  1  A5 10                lda     Protocol::Button0
-006209  1  20 30 60             jsr     SSC::Put
-00620C  1  A9 01                lda     #1              ; Data size
-00620E  1  20 30 60             jsr     SSC::Put
-006211  1  AD 61 C0             lda     BUTN0
-006214  1  20 30 60             jsr     SSC::Put
-006217  1               
-006217  1  A5 11                lda     Protocol::Button1
-006219  1  20 30 60             jsr     SSC::Put
-00621C  1  A9 01                lda     #1              ; Data size
-00621E  1  20 30 60             jsr     SSC::Put
-006221  1  AD 62 C0             lda     BUTN1
-006224  1  20 30 60             jsr     SSC::Put
-006227  1               
-006227  1  60                   rts
-006228  1               .endproc
-006228  1               
-006228  1               ;;;------------------------------------------------------------
-006228  1               ;;; Paddles
-006228  1               
-006228  1                   .ifdef PADDLE_SUPPORT
-006228  1               .proc SendPaddles
-006228  1               
-006228  1  A5 20                lda     Protocol::Paddle0
-00622A  1  20 30 60             jsr     SSC::Put
-00622D  1  A9 01                lda     #1              ; Data size
-00622F  1  20 30 60             jsr     SSC::Put
-006232  1               
-006232  1  A2 00                ldx     #0
-006234  1  20 4F 62             jsr     pread
-006237  1  98                   tya
+0061D3  1  A9 00                lda     #0              ; set up write pointer
+0061D5  1  85 FA                sta     ptr
+0061D7  1  A5 E6                lda     PAGE
+0061D9  1  85 FB                sta     ptr+1
+0061DB  1  A2 20                ldx     #PAGESIZE       ; plan to receive this many pages
+0061DD  1  A0 00                ldy     #0
+0061DF  1               
+0061DF  1  20 3D 60     :       jsr     SSC::Get
+0061E2  1  91 FA                sta     (ptr),Y
+0061E4  1               
+0061E4  1  C8                   iny
+0061E5  1  D0 F8                bne     :-              ; Do a full page...
+0061E7  1               
+0061E7  1                       ;; Interleave to maintain responsiveness
+0061E7  1               .if 0
+0061E7  1                       jsr     SendInputState
+0061E7  1               .endif
+0061E7  1               
+0061E7  1  E6 FB                inc     ptr+1
+0061E9  1  CA                   dex
+0061EA  1  D0 F3                bne     :-              ; ...as many pages as we need
+0061EC  1  60                   rts
+0061ED  1               .endproc
+0061ED  1               
+0061ED  1               
+0061ED  1               ;;;-------------------------------------------------------------------
+0061ED  1               ;;;
+0061ED  1               ;;; Input device routines
+0061ED  1               ;;;
+0061ED  1               ;;;-------------------------------------------------------------------
+0061ED  1               
+0061ED  1               ;;;---------------------------------------------------------
+0061ED  1               ;;; Initialize input devices and storage for detecting
+0061ED  1               ;;; state transitions
+0061ED  1               
+0061ED  1               .proc InitInput
+0061ED  1               
+0061ED  1                   .ifdef MOUSE_SUPPORT
+0061ED  1  20 61 60             jsr     Mouse::FindMouse
+0061F0  1                   .endif
+0061F0  1               
+0061F0  1  60                   rts
+0061F1  1               .endproc
+0061F1  1               
+0061F1  1               
+0061F1  1               ;;;---------------------------------------------------------
+0061F1  1               ;;; Send a full set of input state updates.
+0061F1  1               
+0061F1  1               ;;; Assumes time to transmit is roughly comparable to time
+0061F1  1               ;;; to measure input state, therefore only sending changes is
+0061F1  1               ;;; not worthwhile in most cases.
+0061F1  1               
+0061F1  1               .proc SendInputState
+0061F1  1  20 FE 61             jsr     MaybeSendKeyboard
+0061F4  1  20 31 62             jsr     SendButtons
+0061F7  1               
+0061F7  1                   .ifdef PADDLE_SUPPORT
+0061F7  1  20 52 62             jsr     SendPaddles
+0061FA  1                   .endif
+0061FA  1               
+0061FA  1                   .ifdef MOUSE_SUPPORT
+0061FA  1  20 15 61             jsr     Mouse::SendMouse
+0061FD  1                   .endif
+0061FD  1               
+0061FD  1               .endproc
+0061FD  1               
+0061FD  1               
+0061FD  1               ;;;------------------------------------------------------------
+0061FD  1               ;;; Keyboard
+0061FD  1               
+0061FD  1               ;;; NOTE: Can't use KBDSTRB to detect key up -> key down transition
+0061FD  1               ;;; since the msb can change before the key code. Instead, consider
+0061FD  1               ;;; these cases:
+0061FD  1               ;;;
+0061FD  1               ;;;  OLD STATE    KBD       KBDSTRB    RESULT
+0061FD  1               ;;;   Up           Up        -          No-op
+0061FD  1               ;;;   Up           Down      -          Save and send key down
+0061FD  1               ;;;   Down         -         Up         Save and send key up
+0061FD  1               ;;;   Down         -         Down       Save and send key ONLY if different
+0061FD  1               ;;;
+0061FD  1               
+0061FD  1  00           last_kb:        .byte   0
+0061FE  1               
+0061FE  1               .proc MaybeSendKeyboard
+0061FE  1  AD FD 61             lda     last_kb
+006201  1  D0 08                bne     key_was_down
+006203  1               
+006203  1               key_was_up:
+006203  1                       ;; Key was up - send only if now down.
+006203  1  AD 00 C0             lda     KBD             ; Read keyboard
+006206  1  10 28                bpl     done            ; Do nothing if it is still up.
+006208  1  4C 1D 62             jmp     send            ; Otherwise send.
+00620B  1               
+00620B  1               key_was_down:
+00620B  1                       ;; Key was down - strobe should match
+00620B  1                       ;; unless the key changed or was released.
+00620B  1  AD 10 C0             lda     KBDSTRB
+00620E  1  30 05                bmi     kbdstrb_down
+006210  1               
+006210  1               kbdstrb_up:
+006210  1  A9 00                lda     #0              ; Now released
+006212  1  4C 1D 62             jmp     send
+006215  1               
+006215  1               kbdstrb_down:
+006215  1  CD FD 61             cmp     last_kb         ; Same key as last time?
+006218  1  F0 16                beq     done            ; - no change, don't send.
+00621A  1  4C 1D 62             jmp     send
+00621D  1               
+00621D  1  8D FD 61     send:   sta     last_kb
+006220  1  A5 00                lda     Protocol::Keyboard
+006222  1  20 30 60             jsr     SSC::Put
+006225  1  A9 01                lda     #1              ; Data size
+006227  1  20 30 60             jsr     SSC::Put
+00622A  1  AD FD 61             lda     last_kb
+00622D  1  20 30 60             jsr     SSC::Put
+006230  1               
+006230  1  60           done:   rts
+006231  1               .endproc
+006231  1               
+006231  1               ;;;------------------------------------------------------------
+006231  1               ;;; Buttons
+006231  1               
+006231  1               .proc SendButtons
+006231  1               
+006231  1  A5 10                lda     Protocol::Button0
+006233  1  20 30 60             jsr     SSC::Put
+006236  1  A9 01                lda     #1              ; Data size
 006238  1  20 30 60             jsr     SSC::Put
-00623B  1               
-00623B  1                       ;; Need to wait 3ms between reads.
-00623B  1               
-00623B  1  A5 21                lda     Protocol::Paddle1
-00623D  1  20 30 60             jsr     SSC::Put
-006240  1  A9 01                lda     #1              ; Data size
-006242  1  20 30 60             jsr     SSC::Put
-006245  1               
-006245  1  A2 01                ldx     #1
-006247  1  20 4F 62             jsr     pread
-00624A  1  98                   tya
-00624B  1  20 30 60             jsr     SSC::Put
-00624E  1               
-00624E  1  60                   rts
-00624F  1               
-00624F  1               .proc pread
-00624F  1                       ;; Let any previous timer reset
-00624F  1  BD 64 C0     :       lda     PADDL0,x
-006252  1  30 FB                bmi     :-
-006254  1               
-006254  1                       ;; Read paddle
-006254  1  AD 70 C0             lda     PTRIG
-006257  1  A0 00                ldy     #0
-006259  1  EA                   nop
-00625A  1  EA                   nop
-00625B  1  BD 64 C0     :       lda     PADDL0,X
-00625E  1  10 03                bpl     done
-006260  1  C8                   iny
-006261  1  D0 F8                bne     :-
-006263  1  60           done:   rts
-006264  1               .endproc
-006264  1               
-006264  1               .endproc
-006264  1                   .endif
-006264  1               
-006264  1               ;;;-------------------------------------------------------------------
-006264  1               ;;;
-006264  1               ;;; Hi-res graphics routines
-006264  1               ;;;
-006264  1               ;;;-------------------------------------------------------------------
-006264  1               
-006264  1               ;;;---------------------------------------------------------
-006264  1               ;;; Set up the graphics display and pointers
-006264  1               
-006264  1               .proc InitHires
-006264  1  A9 20                lda     #PAGE1          ; clear page 1
-006266  1  85 E6                sta     PAGE
-006268  1  20 F2 F3             jsr     HCLR
-00626B  1               
-00626B  1                       ;; Show page 1
-00626B  1  8D 57 C0             sta     HIRES
-00626E  1  8D 50 C0             sta     TXTCLR
-006271  1  8D 52 C0             sta     MIXCLR
-006274  1  8D 54 C0             sta     LOWSCR
-006277  1               
-006277  1                       ;; And set up writing to page 2
-006277  1  A9 40                lda     #PAGE2
-006279  1  85 E6                sta     PAGE
-00627B  1               
-00627B  1  60                   rts
-00627C  1               .endproc
-00627C  1               
-00627C  1               
-00627C  1               ;;;---------------------------------------------------------
-00627C  1               ;;; Call when done with the current plotting page
-00627C  1               ;;; (selected in PAGE) and it will be shown and the
-00627C  1               ;;; other page will be shown.
-00627C  1               
-00627C  1               .proc FlipHires
-00627C  1  A5 E6                lda     PAGE            ; plotting on which page?
-00627E  1  C9 20                cmp     #PAGE1
-006280  1  F0 08                beq     :+
-006282  1               
-006282  1  8D 55 C0             sta     HISCR           ; page 2 - so show it
-006285  1  A9 20                lda     #PAGE1          ; and plot on page 1
-006287  1  85 E6                sta     PAGE
-006289  1  60                   rts
-00628A  1               
-00628A  1  8D 54 C0     :       sta     LOWSCR          ; page 1 - so show it
-00628D  1  A9 40                lda     #PAGE2          ; and plot on page 2
-00628F  1  85 E6                sta     PAGE
-006291  1  60                   rts
-006292  1               .endproc
-006292  1               
+00623B  1  AD 61 C0             lda     BUTN0
+00623E  1  20 30 60             jsr     SSC::Put
+006241  1               
+006241  1  A5 11                lda     Protocol::Button1
+006243  1  20 30 60             jsr     SSC::Put
+006246  1  A9 01                lda     #1              ; Data size
+006248  1  20 30 60             jsr     SSC::Put
+00624B  1  AD 62 C0             lda     BUTN1
+00624E  1  20 30 60             jsr     SSC::Put
+006251  1               
+006251  1  60                   rts
+006252  1               .endproc
+006252  1               
+006252  1               ;;;------------------------------------------------------------
+006252  1               ;;; Paddles
+006252  1               
+006252  1                   .ifdef PADDLE_SUPPORT
+006252  1               .proc SendPaddles
+006252  1               
+006252  1  A5 20                lda     Protocol::Paddle0
+006254  1  20 30 60             jsr     SSC::Put
+006257  1  A9 01                lda     #1              ; Data size
+006259  1  20 30 60             jsr     SSC::Put
+00625C  1               
+00625C  1  A2 00                ldx     #0
+00625E  1  20 79 62             jsr     pread
+006261  1  98                   tya
+006262  1  20 30 60             jsr     SSC::Put
+006265  1               
+006265  1                       ;; Need to wait 3ms between reads.
+006265  1               
+006265  1  A5 21                lda     Protocol::Paddle1
+006267  1  20 30 60             jsr     SSC::Put
+00626A  1  A9 01                lda     #1              ; Data size
+00626C  1  20 30 60             jsr     SSC::Put
+00626F  1               
+00626F  1  A2 01                ldx     #1
+006271  1  20 79 62             jsr     pread
+006274  1  98                   tya
+006275  1  20 30 60             jsr     SSC::Put
+006278  1               
+006278  1  60                   rts
+006279  1               
+006279  1               .proc pread
+006279  1                       ;; Let any previous timer reset
+006279  1  BD 64 C0     :       lda     PADDL0,x
+00627C  1  30 FB                bmi     :-
+00627E  1               
+00627E  1                       ;; Read paddle
+00627E  1  AD 70 C0             lda     PTRIG
+006281  1  A0 00                ldy     #0
+006283  1  EA                   nop
+006284  1  EA                   nop
+006285  1  BD 64 C0     :       lda     PADDL0,X
+006288  1  10 03                bpl     done
+00628A  1  C8                   iny
+00628B  1  D0 F8                bne     :-
+00628D  1  60           done:   rts
+00628E  1               .endproc
+00628E  1               
+00628E  1               .endproc
+00628E  1                   .endif
+00628E  1               
+00628E  1               ;;;-------------------------------------------------------------------
+00628E  1               ;;;
+00628E  1               ;;; Hi-res graphics routines
+00628E  1               ;;;
+00628E  1               ;;;-------------------------------------------------------------------
+00628E  1               
+00628E  1               ;;;---------------------------------------------------------
+00628E  1               ;;; Set up the graphics display and pointers
+00628E  1               
+00628E  1               .proc InitHires
+00628E  1  A9 20                lda     #PAGE1          ; clear page 1
+006290  1  85 E6                sta     PAGE
+006292  1  20 F2 F3             jsr     HCLR
+006295  1               
+006295  1                       ;; Show page 1
+006295  1  8D 57 C0             sta     HIRES
+006298  1  8D 50 C0             sta     TXTCLR
+00629B  1  8D 52 C0             sta     MIXCLR
+00629E  1  8D 54 C0             sta     LOWSCR
+0062A1  1               
+0062A1  1                       ;; And set up writing to page 2
+0062A1  1  A9 40                lda     #PAGE2
+0062A3  1  85 E6                sta     PAGE
+0062A5  1               
+0062A5  1  60                   rts
+0062A6  1               .endproc
+0062A6  1               
+0062A6  1               
+0062A6  1               ;;;---------------------------------------------------------
+0062A6  1               ;;; Call when done with the current plotting page
+0062A6  1               ;;; (selected in PAGE) and it will be shown and the
+0062A6  1               ;;; other page will be shown.
+0062A6  1               
+0062A6  1               .proc FlipHires
+0062A6  1  A5 E6                lda     PAGE            ; plotting on which page?
+0062A8  1  C9 20                cmp     #PAGE1
+0062AA  1  F0 08                beq     :+
+0062AC  1               
+0062AC  1  8D 55 C0             sta     HISCR           ; page 2 - so show it
+0062AF  1  A9 20                lda     #PAGE1          ; and plot on page 1
+0062B1  1  85 E6                sta     PAGE
+0062B3  1  60                   rts
+0062B4  1               
+0062B4  1  8D 54 C0     :       sta     LOWSCR          ; page 1 - so show it
+0062B7  1  A9 40                lda     #PAGE2          ; and plot on page 2
+0062B9  1  85 E6                sta     PAGE
+0062BB  1  60                   rts
+0062BC  1               .endproc
+0062BC  1               

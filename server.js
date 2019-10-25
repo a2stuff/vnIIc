@@ -379,7 +379,7 @@ $('#bootstrap').addEventListener('click', async e => {
 
 async function getSerialPort() {
 
-  const port = await navigator.serial.requestPort();
+  const port = await navigator.serial.requestPort({});
   if (!port) throw new Error('No ports');
 
   return {

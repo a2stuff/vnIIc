@@ -421,7 +421,7 @@ async function getSerialPort() {
       if (n <= 0) throw new Error();
       const result = [];
       while (result.length < n) {
-        const {value, done} = await gen.next();
+        const {value, done} = await this.gen.next();
         if (done) throw new Error('out of data');
         result.push(value);
       }
@@ -463,7 +463,7 @@ async function startStreaming() {
   };
 
 
-  while (true) {
+  for (;;) {
     const command = (await port.read(1))[0];
     const size = (await port.read(1))[0];
     const data = size ? await port.read(size) : [];
@@ -491,9 +491,11 @@ async function startStreaming() {
       // Screen
     case 0x80:
       // Send a copy
-      let copy = new Uint8Array(hires_buffer);
-      await port.write(copy);
-      break;
+      {
+        let copy = new Uint8Array(hires_buffer);
+        await port.write(copy);
+        break;
+      }
 
     default:
       console.warn(`Unexpected protocol command: ${command}`);
